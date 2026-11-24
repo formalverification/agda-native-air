@@ -35,7 +35,13 @@
 --      across a fill (#79).
 --      1m: the stamp of the Agda a spawn would start (#347), on stand-in
 --      files and an identity command, no Agda; 1n: the outputTail of a
---      failure no diagnostic explains (#346), on stand-in --agda-bins.
+--      failure no diagnostic explains (#346), on stand-in --agda-bins;
+--      1o: fill_hole's patch and apply and the guarded in-place write
+--      (#136), on stand-in --agda-bins that record the bytes they are handed
+--      or write over the file as another writer would; 2k: the same patch
+--      held to Agda's own interaction points in four encodings, candidates
+--      applied until the file checks, and the lane after an apply; 2l:
+--      --no-apply through the real executable.
 --   3. The interaction lane (needs agda on PATH): the live-query tools, and
 --      3b: search_in_scope (#17) against the fixture corpus and the narrow
 --      imports of ScopeSearch.agda, every rendering typed by the lane; 3d: a
@@ -43,7 +49,8 @@
 --      through stand-in --agda-bins that exec the real one.
 --
 --   Tier 2 tests are skipped gracefully if Agda is not available, making the test
---   suite safe to run in CI without a Nix shell.
+--   suite safe to run in CI without a Nix shell.  Setting AGDA_MCP_TEST_NO_AGDA
+--   skips them where Agda is available too, to run the earlier tiers alone.
 --
 --   Planned Tests (v1):
 --     We will add a third tier of tests that run the full MCP server and send
@@ -86,7 +93,7 @@ import System.Directory
   , createFileLink, removeDirectoryRecursive, removeFile, setModificationTime
   , setOwnerExecutable, setPermissions
   )
-import System.Environment (setEnv)
+import System.Environment (lookupEnv, setEnv)
 import System.Exit (ExitCode (..), exitFailure, exitSuccess)
 import System.Process (readProcessWithExitCode)
 import qualified System.Process as P
@@ -115,9 +122,10 @@ import AgdaMCP.Holes
   ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly
   , HoleSpan (..) , findHoles , findNthHole
   , HoleRef (..) , ResolvedBy (..) , ResolvedHole (..) , offsetOfPosition , resolveHoleRef
-  , injectReportExpr , substituteHole
+  , injectReportExpr , substituteHole , positionOfOffset
   )
 import AgdaMCP.Corpus (corpusIndexOf, loadCorpus, searchByName, searchByType, getDeps)
+import AgdaMCP.Digest (sha256Hex, sourceDigest)
 import AgdaMCP.Path (ioProblem)
 import AgdaMCP.Diagnostics
   ( attachUnsolvedMetas, capDiagnostics, defaultMaxDiagnostics, diagnosticRank
@@ -158,7 +166,8 @@ import AgdaMCP.Tools.CheckProject
   , outputTailOf )
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
-  , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
+  , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors
+  , runInPlace )
 import AgdaMCP.Tools.LiveQueries
   ( handleDefinitionOf, handleExportsOf, handleNormalize, handleResolveName
   , handleTypeOf, pageExports, quoteSites )
@@ -236,6 +245,7 @@ failureText (FailTimeout tf)     = tfMessage tf
 failureText (FailProject pm)     = mismatchMessage pm
 failureText (FailPath pf)        = pathFailureMessage pf
 failureText (FailInteraction xf) = xfMessage xf
+failureText (FailFileChanged fc) = fileChangedMessage fc
 
 -- | fakeResult: a synthetic 'AgdaResult' for the pure 'checkedFromSourceOf'
 -- tests — exit code, timed-out flag, and stdout, with the fields the signal
@@ -1940,6 +1950,7 @@ advertisedTools = toolDefinitions ServerConfig
   , scCorpusIndex = Nothing
   , scExpose      = Nothing
   , scAuto        = False
+  , scNoApply     = False
   }
 
 holeAddressingTests :: IO [Bool]
@@ -2754,6 +2765,7 @@ corpusConfig = ServerConfig
   , scCorpusIndex = Just (indexOf [])
   , scExpose      = Nothing
   , scAuto        = False
+  , scNoApply     = False
   }
 
 -- | autoConfig: the corpus configuration with auto registered (@--auto@,
@@ -3224,6 +3236,7 @@ timeoutTests = do
         { fhFilePath  = timeoutFixturePath
         , fhHole      = ByIndex 0
         , fhCandidate = "zero"
+        , fhApply = False, fhPatch = False
         }
       after <- BS.readFile timeoutFixturePath
       results3 <- sequence
@@ -3273,6 +3286,9 @@ timeoutTests = do
               Left (FailInteraction xf) ->
                 pure (Fail $ "expected FailTimeout, got FailInteraction: "
                              <> T.unpack (xfMessage xf))
+              Left (FailFileChanged fc) ->
+                pure (Fail $ "expected FailTimeout, got FailFileChanged: "
+                             <> T.unpack (fileChangedMessage fc))
               Left (FailTimeout tf) -> do
                 r1 <- assert ("elapsedMs = " <> show (tfElapsedMs tf)) (tfElapsedMs tf > 0)
                 case r1 of
@@ -3510,7 +3526,7 @@ echoTests = do
       green    <- withFakeExit 0  $ handleCheckFile injLanes echoCfg (CheckFileParams timeoutFixturePath Nothing)
       -- A fill the stand-in accepts, for the lean-answer rules (#184).
       okFill   <- withFakeExit 0  $ handleFillHole echoCfg FillHoleParams
-        { fhFilePath = timeoutFixturePath, fhHole = ByIndex 0, fhCandidate = "zero" }
+        { fhFilePath = timeoutFixturePath, fhHole = ByIndex 0, fhCandidate = "zero", fhApply = False, fhPatch = False }
 
       shape <- sequence
         [ runTest "check_file: success is read from the exit code, not from Agda's prose" $
@@ -3626,7 +3642,7 @@ echoTests = do
         badDiag <- handleGetDiagnostics injLanes rootCfg (GetDiagnosticsParams targetB Nothing)
         beforeB <- BS.readFile targetB
         badFill <- handleFillHole rootCfg FillHoleParams
-          { fhFilePath = targetB, fhHole = ByIndex 0, fhCandidate = "zero" }
+          { fhFilePath = targetB, fhHole = ByIndex 0, fhCandidate = "zero", fhApply = False, fhPatch = False }
         afterB  <- BS.readFile targetB
         sequence
           [ runTest "root resolution: a file in the registered checkout resolves to it" $
@@ -5310,7 +5326,7 @@ pathTests = do
     goalMiss <- handleGetGoal injLanes cfg GetGoalParams
       { ggFilePath = csMissing cs, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
     fillMiss <- handleFillHole cfg FillHoleParams
-      { fhFilePath = csMissing cs, fhHole = ByIndex 0, fhCandidate = "zero" }
+      { fhFilePath = csMissing cs, fhHole = ByIndex 0, fhCandidate = "zero", fhApply = False, fhPatch = False }
     dirCall  <- handleCheckFile injLanes cfg (CheckFileParams (csRoot cs) Nothing)
     -- A relative path that resolves to a directory that is really there: "test",
     -- from the test process's own working directory.
@@ -6179,6 +6195,7 @@ integrationTests cfg fixturePath repoRoot = do
               { fhFilePath  = fixturePath
               , fhHole      = ByIndex 0
               , fhCandidate = "x"
+              , fhApply = False, fhPatch = False
               }
         result <- handleFillHole cfg params
         case result of
@@ -6190,6 +6207,7 @@ integrationTests cfg fixturePath repoRoot = do
               { fhFilePath  = fixturePath
               , fhHole      = ByIndex 0
               , fhCandidate = "tt"
+              , fhApply = False, fhPatch = False
               }
         result <- handleFillHole cfg params
         case result of
@@ -6274,7 +6292,7 @@ integrationTests cfg fixturePath repoRoot = do
 
     , runTest "fill_hole: a real fill carries elapsedMs and is not a timeout" $ do
         let params = FillHoleParams
-              { fhFilePath = fixturePath, fhHole = ByIndex 0, fhCandidate = "x" }
+              { fhFilePath = fixturePath, fhHole = ByIndex 0, fhCandidate = "x", fhApply = False, fhPatch = False }
         result <- handleFillHole cfg params
         case result of
           Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -6352,7 +6370,7 @@ hierIntegrationTests cfg repoRoot = do
 
         , runTest "fill_hole: Proofs.Use with cross-directory 'thing' succeeds" $ do
             let params = FillHoleParams
-                  { fhFilePath = useFile, fhHole = ByIndex 0, fhCandidate = "thing" }
+                  { fhFilePath = useFile, fhHole = ByIndex 0, fhCandidate = "thing", fhApply = False, fhPatch = False }
             result <- handleFillHole hierCfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -6360,7 +6378,7 @@ hierIntegrationTests cfg repoRoot = do
 
         , runTest "fill_hole: Proofs.Use with ill-typed 'tt' is a type error" $ do
             let params = FillHoleParams
-                  { fhFilePath = useFile, fhHole = ByIndex 0, fhCandidate = "tt" }
+                  { fhFilePath = useFile, fhHole = ByIndex 0, fhCandidate = "tt", fhApply = False, fhPatch = False }
             result <- handleFillHole hierCfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack (failureText err))
@@ -6400,7 +6418,7 @@ fillVerdictTests cfg = do
       results <- sequence
         [ runTest "fill_hole: candidate leaving an unsolved meta is a type error" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "implicitOnly" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "implicitOnly", fhApply = False, fhPatch = False }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack (failureText err))
@@ -6413,7 +6431,7 @@ fillVerdictTests cfg = do
 
         , runTest "fill_hole: well-typed candidate with another hole open stays ok" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "zero" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "zero", fhApply = False, fhPatch = False }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -6421,7 +6439,7 @@ fillVerdictTests cfg = do
 
         , runTest "fill_hole: candidate introducing a new sub-hole stays ok" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "suc {!!}" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "suc {!!}", fhApply = False, fhPatch = False }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -6432,7 +6450,7 @@ fillVerdictTests cfg = do
         -- remainingHoles — here hole h plus the new `?`.
         , runTest "fill_hole: a '?' sub-hole is tolerated AND counted (#71)" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "suc ?" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "suc ?", fhApply = False, fhPatch = False }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -6506,7 +6524,7 @@ holeModelIntegrationTests cfg = do
             -- remainingHoles == 3 proves the fill hit the real hole, not a
             -- decoy (writing into a comment would leave all 4 holes open).
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = variants, fhHole = ByIndex 0, fhCandidate = "zero" }
+              { fhFilePath = variants, fhHole = ByIndex 0, fhCandidate = "zero", fhApply = False, fhPatch = False }
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> do
@@ -6517,7 +6535,7 @@ holeModelIntegrationTests cfg = do
 
         , runTest "fill_hole: a standalone ? hole is addressable and fillable" $ do
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = variants, fhHole = ByIndex 3, fhCandidate = "zero" }
+              { fhFilePath = variants, fhHole = ByIndex 3, fhCandidate = "zero", fhApply = False, fhPatch = False }
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> do
@@ -6542,9 +6560,9 @@ holeModelIntegrationTests cfg = do
 
         , runTest "fill_hole: {! zero !} in a .lagda.md fills like in a .agda" $ do
             mdFill    <- handleFillHole cfg FillHoleParams
-              { fhFilePath = lagdaMd, fhHole = ByIndex 0, fhCandidate = "zero" }
+              { fhFilePath = lagdaMd, fhHole = ByIndex 0, fhCandidate = "zero", fhApply = False, fhPatch = False }
             plainFill <- handleFillHole cfg FillHoleParams
-              { fhFilePath = plainTwin, fhHole = ByIndex 0, fhCandidate = "zero" }
+              { fhFilePath = plainTwin, fhHole = ByIndex 0, fhCandidate = "zero", fhApply = False, fhPatch = False }
             case (mdFill, plainFill) of
               (Right md, Right plain) -> do
                 r1 <- assertEqual "status (.lagda.md)" FillOk (frStatus md)
@@ -6662,7 +6680,7 @@ holeModelIntegrationTests cfg = do
             -- LiterateMd has exactly one real hole; its prose decoys must
             -- not create an index 1.
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = lagdaMd, fhHole = ByIndex 1, fhCandidate = "zero" }
+              { fhFilePath = lagdaMd, fhHole = ByIndex 1, fhCandidate = "zero", fhApply = False, fhPatch = False }
             case result of
               Left err -> assert "error names the missing index"
                             ("Hole index 1" `T.isInfixOf` failureText err)
@@ -7032,9 +7050,9 @@ holeAddressingIntegrationTests cfg = do
                 plainGoal <- handleGetGoal injLanes cfg GetGoalParams
                   { ggFilePath = plainTwin, ggHole = plainRef, ggReload = False, ggRewrite = editorRewrite }
                 mdFill    <- handleFillHole cfg FillHoleParams
-                  { fhFilePath = lagdaMd,   fhHole = mdRef,    fhCandidate = "zero" }
+                  { fhFilePath = lagdaMd,   fhHole = mdRef,    fhCandidate = "zero", fhApply = False, fhPatch = False }
                 plainFill <- handleFillHole cfg FillHoleParams
-                  { fhFilePath = plainTwin, fhHole = plainRef, fhCandidate = "zero" }
+                  { fhFilePath = plainTwin, fhHole = plainRef, fhCandidate = "zero", fhApply = False, fhPatch = False }
                 case (mdGoal, plainGoal, mdFill, plainFill) of
                   (Right mg, Right pg, Right mf, Right pf) -> allOf
                     [ assert "the twins' holes sit on different lines"
@@ -7070,6 +7088,7 @@ holeAddressingIntegrationTests cfg = do
                   { fhFilePath  = twoHoles
                   , fhHole      = ByPosition (hsLine h0) (hsCol h0)
                   , fhCandidate = candidate
+                  , fhApply = False, fhPatch = False
                   }
                 case result of
                   Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -7115,7 +7134,7 @@ holeAddressingIntegrationTests cfg = do
         -- says how, and the verdict is Agda's as before.
         , runTest "fill_hole: one column before the only hole fills it and says so (#201)" $ do
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = plainTwin, fhHole = ByPosition 15 4, fhCandidate = "zero" }
+              { fhFilePath = plainTwin, fhHole = ByPosition 15 4, fhCandidate = "zero", fhApply = False, fhPatch = False }
             withRight result $ \fr -> allOf
               [ assertEqual "status" FillOk (frStatus fr)
               , assertEqual "addressed" (HoleAddressed 15 5 "only hole, same line") (frAddressed fr)
@@ -7124,7 +7143,7 @@ holeAddressingIntegrationTests cfg = do
 
         , runTest "fill_hole: no address fills the only hole and says so (#201)" $ do
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = plainTwin, fhHole = Unaddressed, fhCandidate = "zero" }
+              { fhFilePath = plainTwin, fhHole = Unaddressed, fhCandidate = "zero", fhApply = False, fhPatch = False }
             withRight result $ \fr -> allOf
               [ assertEqual "status" FillOk (frStatus fr)
               , assertEqual "addressed" (HoleAddressed 15 5 "only hole") (frAddressed fr)
@@ -7132,7 +7151,7 @@ holeAddressingIntegrationTests cfg = do
 
         , runTest "fill_hole: a position in the span says span (#201)" $ do
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = plainTwin, fhHole = ByPosition 15 8, fhCandidate = "zero" }
+              { fhFilePath = plainTwin, fhHole = ByPosition 15 8, fhCandidate = "zero", fhApply = False, fhPatch = False }
             withRight result $ \fr ->
               assertEqual "addressed" (HoleAddressed 15 5 "span") (frAddressed fr)
 
@@ -7149,11 +7168,11 @@ holeAddressingIntegrationTests cfg = do
         -- same near misses are refused before Agda runs.
         , runTest "fill_hole: two holes, a position between them is still refused (#201)" $ do
             between <- handleFillHole cfg FillHoleParams
-              { fhFilePath = twoHoles, fhHole = ByPosition 23 1, fhCandidate = "zero" }
+              { fhFilePath = twoHoles, fhHole = ByPosition 23 1, fhCandidate = "zero", fhApply = False, fhPatch = False }
             short   <- handleFillHole cfg FillHoleParams
-              { fhFilePath = twoHoles, fhHole = ByPosition 22 4, fhCandidate = "zero" }
+              { fhFilePath = twoHoles, fhHole = ByPosition 22 4, fhCandidate = "zero", fhApply = False, fhPatch = False }
             none    <- handleFillHole cfg FillHoleParams
-              { fhFilePath = twoHoles, fhHole = Unaddressed, fhCandidate = "zero" }
+              { fhFilePath = twoHoles, fhHole = Unaddressed, fhCandidate = "zero", fhApply = False, fhPatch = False }
             let refusedWith needle r = case r of
                   Left e  -> assert ("message: " <> T.unpack (failureText e))
                                (needle `T.isInfixOf` failureText e)
@@ -7187,7 +7206,7 @@ reanchorTest cfg path =
         let p0 = ByPosition (hsLine h0) (hsCol h0)
             p1 = ByPosition (hsLine h1) (hsCol h1)
         fill <- handleFillHole cfg FillHoleParams
-          { fhFilePath = path, fhHole = p0, fhCandidate = "zero" }
+          { fhFilePath = path, fhHole = p0, fhCandidate = "zero", fhApply = False, fhPatch = False }
         case (fill, substituteHole flav 0 "zero" src) of
           (Left err, _) -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
           (_, Nothing)  -> pure (Fail "substituteHole returned Nothing for hole 0")
@@ -8770,7 +8789,7 @@ interactionLaneTests cfg repoRoot = do
           r <- giveCandidate lh (fx "TwoHoles.agda") flags
                  (firstPointId li) WithoutForce "implicitOnly"
           batch <- handleFillHole cfg
-                     (FillHoleParams (fx "TwoHoles.agda") (ByIndex 0) "implicitOnly")
+                     (FillHoleParams (fx "TwoHoles.agda") (ByIndex 0) "implicitOnly" False False)
           case (r, batch) of
             (Left lf, _)  -> pure (Fail (T.unpack (lfMessage lf)))
             (_, Left err) -> pure (Fail (T.unpack (failureText err)))
@@ -9812,10 +9831,10 @@ autoLaneTests cfg repoRoot = do
                   either (const Nothing) (Just . auAnswer)
                     <$> autoAt lh fixture flags (ipId p) ""
                 _ -> pure Nothing
-            joined  <- handleFillHole cfg (FillHoleParams fixture (ByIndex 2) t)
+            joined  <- handleFillHole cfg (FillHoleParams fixture (ByIndex 2) t False False)
             case raw of
               Right (Just (AutoTerm printed)) -> do
-                asPrinted <- handleFillHole cfg (FillHoleParams fixture (ByIndex 2) printed)
+                asPrinted <- handleFillHole cfg (FillHoleParams fixture (ByIndex 2) printed False False)
                 allOf
                   [ assert "one line" (not ("\n" `T.isInfixOf` t))
                   , assert "Agda printed it across lines" ("\n" `T.isInfixOf` printed)
@@ -10337,6 +10356,820 @@ definitionTextLaneTests cfg repoRoot = do
   shutdownLanes lanes
   pure results
 
+-- ---------------------------------------------------------------------------
+-- Tier 1o: fill_hole's patch, its apply, and the guarded write (issue #136),
+-- no Agda
+--
+-- A patch is a claim a client acts on: this text, at this place, becomes that
+-- text, and the result is what Agda judged.  So the stand-in agdas below
+-- record the bytes they are handed, and each test applies the patch itself,
+-- by its own reading of the two units, and compares.  The other stand-ins are
+-- the other writer: one saves over the file during the check and one moves it
+-- away, and the file must be left as they left it on every path that writes.
+--
+-- The positions asserted here are batch Agda 2.9.0's own (its listing of the
+-- fixture's unsolved interaction metas); tier 2k asks the lane for them again
+-- on every run, for each of the four encodings.
+-- ---------------------------------------------------------------------------
+
+-- | The fixture: one hole of each syntax, on lines where a column, a UTF-16
+-- offset, and a byte offset differ.
+patchFixturePath :: FilePath
+patchFixturePath = "test" </> "resources" </> "PatchUnits.agda"
+
+-- | Where Agda places the fixture's holes, and the text there.
+patchFixtureHoles :: [(DiagRange, Text)]
+patchFixtureHoles =
+  [ (DiagRange 29 9  29 13, "{!!}")
+  , (DiagRange 33 9  33 10, "?")
+  , (DiagRange 37 7  37 17, "{! zero !}")
+  , (DiagRange 44 17 44 18, "?")
+  , (DiagRange 44 19 44 20, "?")
+  ]
+
+-- | One candidate per hole; each differs from its hole in length, and two of
+-- them hold the glyph, so every offset after a patch moves.
+patchFixtureCandidates :: [Text]
+patchFixtureCandidates = ["zero", "𝑨", "(suc 𝑨)", "zero", "(suc zero)"]
+
+-- | The encodings a file may arrive in: Agda reads all four as one text, a
+-- leading byte-order mark dropped and each CR LF one line end.
+data Encoding = Encoding { encTag :: String, encName :: String, encBom :: Bool, encCrLf :: Bool }
+
+encodings :: [Encoding]
+encodings =
+  [ Encoding "lf"      "LF"                           False False
+  , Encoding "crlf"    "CR LF"                        False True
+  , Encoding "bom"     "a byte-order mark"            True  False
+  , Encoding "bomcrlf" "a byte-order mark and CR LF"  True  True
+  ]
+
+lfEncoding :: Encoding
+lfEncoding = Encoding "lf" "LF" False False
+
+utf8Bom :: BS.ByteString
+utf8Bom = BS.pack [0xEF, 0xBB, 0xBF]
+
+encodeAs :: Encoding -> Text -> BS.ByteString
+encodeAs e t =
+  (if encBom e then utf8Bom else BS.empty)
+    <> TE.encodeUtf8 (if encCrLf e then T.replace "\n" "\r\n" t else t)
+
+-- | applyByBytes: a patch applied by a client that holds the file's bytes.
+applyByBytes :: TextPatch -> BS.ByteString -> BS.ByteString
+applyByBytes p bytes =
+  BS.take (tpByteStart p) bytes <> TE.encodeUtf8 (tpNewText p) <> BS.drop (tpByteEnd p) bytes
+
+-- | How a client counts a column.
+data ColumnUnit = CodePoints | Utf16Units
+
+-- | applyByRange: a patch applied by a client that holds a text, written
+-- from the contract's words and from nothing in the server: a line ends at
+-- LF, a column counts in the given unit, a leading byte-order mark is not
+-- counted, and the range must hold the old text.
+applyByRange :: ColumnUnit -> TextPatch -> Text -> Either String Text
+applyByRange unit p text
+  | found /= tpOldText p =
+      Left ("the range holds " <> show found <> ", not " <> show (tpOldText p))
+  | otherwise = Right (mark <> T.take start body <> tpNewText p <> T.drop end body)
+  where
+    (mark, body) = if "\xFEFF" `T.isPrefixOf` text then T.splitAt 1 text else (T.empty, text)
+    ls           = T.splitOn "\n" body
+    r            = tpRange p
+    start        = offsetOf (rngStartLine r) (rngStartCol r)
+    end          = offsetOf (rngEndLine r) (rngEndCol r)
+    found        = T.take (end - start) (T.drop start body)
+    offsetOf line col =
+      sum (map ((+ 1) . T.length) (take (line - 1) ls))
+        + charsBefore (T.concat (take 1 (drop (line - 1) ls))) col
+    charsBefore l col = case unit of
+      CodePoints -> col - 1
+      -- The characters whose first UTF-16 unit comes before the column.
+      Utf16Units -> length (takeWhile (< col - 1) (scanl (+) 0 (map utf16Units (T.unpack l))))
+    utf16Units c = if c > '\xFFFF' then 2 else 1 :: Int
+
+-- | A stand-in agda: a shell script whose @$f@ is the file it was given (the
+-- last argument, as 'runAgda' passes it).
+standInAgda :: String -> [String] -> IO FilePath
+standInAgda label ls =
+  fakeLaneBinary label (unlines ("#!/bin/sh" : "for a; do f=\"$a\"; done" : ls))
+
+-- | What a stand-in does after it has recorded the file.
+exitsZero, exitsWithOpenHoles, exitsWithTypeError, hangs, savesOver, movesAway :: [String]
+exitsZero          = ["exit 0"]
+exitsWithOpenHoles = ["echo \"$f:29.9-13: error: [UnsolvedInteractionMetas]\" >&2", "exit 42"]
+exitsWithTypeError = ["echo \"$f:29.9-13: error: [UnequalTypes]\" >&2", "exit 42"]
+hangs              = ["exec sleep 30"]
+savesOver          = ["printf 'module Saved where\\n' > \"$f\""]
+movesAway          = ["mv \"$f\" \"$f.moved\""]
+
+-- | The bytes 'savesOver' leaves.
+savedBytes :: BS.ByteString
+savedBytes = "module Saved where\n"
+
+-- | One call against a fresh copy of the fixture, and what the file and the
+-- stand-in held afterwards.
+data Trial a = Trial
+  { trFile     :: FilePath
+  , trOriginal :: BS.ByteString        -- ^ The copy's bytes before the call.
+  , trAfter    :: Maybe BS.ByteString  -- ^ Its bytes after; Nothing if it is gone.
+  , trSeen     :: Maybe BS.ByteString  -- ^ What the stand-in was handed, if it ran.
+  , trResult   :: Either ToolFailure a
+  }
+
+readIfThere :: FilePath -> IO (Maybe BS.ByteString)
+readIfThere f = do
+  there <- doesFileExist f
+  if there then Just <$> BS.readFile f else pure Nothing
+
+-- | trialWith: write the fixture in an encoding, build a stand-in that records
+-- what it is handed and then behaves as given, and run a call against both.
+trialWith
+  :: String -> Encoding -> [String] -> (AgdaConfig -> AgdaConfig)
+  -> (AgdaConfig -> FilePath -> IO (Either ToolFailure a)) -> IO (Trial a)
+trialWith label enc behaviour configure call = do
+  text <- TE.decodeUtf8 <$> BS.readFile patchFixturePath
+  trialOn label "PatchUnits.agda" (encodeAs enc text) behaviour configure call
+
+-- | trialOn: 'trialWith' for a file of the test's own.
+trialOn
+  :: String -> FilePath -> BS.ByteString -> [String] -> (AgdaConfig -> AgdaConfig)
+  -> (AgdaConfig -> FilePath -> IO (Either ToolFailure a)) -> IO (Trial a)
+trialOn label name original behaviour configure call = do
+  dir  <- scratchDir ("patch-" <> label)
+  let file     = dir </> name
+      seen     = dir </> "seen"
+  BS.writeFile file original
+  agda   <- standInAgda ("patch-agda-" <> label) (("cp \"$f\" '" <> seen <> "'") : behaviour)
+  result <- call (configure defaultConfig { agdaBin = agda, agdaFlags = [], agdaTimeout = Just 60 }) file
+  after  <- readIfThere file
+  seenBs <- readIfThere seen
+  pure (Trial file original after seenBs result)
+
+-- | fillTrial: 'trialWith' for one fill_hole call at a position.
+fillTrial
+  :: String -> Encoding -> [String] -> (AgdaConfig -> AgdaConfig)
+  -> (Int, Int) -> Text -> Bool -> Bool -> IO (Trial FillResult)
+fillTrial label enc behaviour configure (line, col) candidate apply patch =
+  trialWith label enc behaviour configure $ \cfg file ->
+    handleFillHole cfg FillHoleParams
+      { fhFilePath = file, fhHole = ByPosition line col, fhCandidate = candidate
+      , fhApply = apply, fhPatch = patch }
+
+-- | withFileChanged: the changed-file failure, or why there is none.
+withFileChanged :: Either ToolFailure a -> (FileChanged -> IO TestResult) -> IO TestResult
+withFileChanged (Left (FailFileChanged fc)) k = k fc
+withFileChanged (Left other) _ = pure . Fail $
+  "expected a fileChanged failure, got: " <> T.unpack (failureText other)
+withFileChanged (Right _) _ = pure (Fail "expected a fileChanged failure, got an answer")
+
+-- | patchIsWhatAgdaRead: for every hole of the fixture in one encoding, the
+-- patch names the span Agda places the hole at, and applied to the original
+-- by either unit it gives the bytes the stand-in was handed.
+patchIsWhatAgdaRead :: Encoding -> IO TestResult
+patchIsWhatAgdaRead enc = allOf
+  [ do t <- fillTrial ("seen-" <> encTag enc <> "-" <> show i) enc exitsZero id
+              (rngStartLine range, rngStartCol range) candidate False True
+       withRight (trResult t) $ \fr -> case (frPatch fr, trSeen t) of
+         (Just p, Just seen) -> allOf
+           [ assertEqual (at <> ": status") FillOk (frStatus fr)
+           , assertEqual (at <> ": the range is where Agda places the hole") range (tpRange p)
+           , assertEqual (at <> ": oldText") old (tpOldText p)
+           , assertEqual (at <> ": newText is the candidate, as sent") candidate (tpNewText p)
+           , assertEqual (at <> ": digest names the bytes read")
+               (sourceDigest (trOriginal t)) (tpDigest p)
+           , assertEqual (at <> ": resultDigest names the bytes agda was handed")
+               (sourceDigest seen) (tpResultDigest p)
+           , assertEqual (at <> ": applied by bytes") seen (applyByBytes p (trOriginal t))
+           , assertEqual (at <> ": applied by line and column, in code points")
+               (Right seen)
+               (TE.encodeUtf8 <$> applyByRange CodePoints p (TE.decodeUtf8 (trOriginal t)))
+           , assertEqual (at <> ": the file is restored, byte for byte")
+               (Just (trOriginal t)) (trAfter t)
+           , assertEqual (at <> ": no applied key was asked for") Nothing (frApplied fr)
+           ]
+         (p, seen) -> pure . Fail $
+           at <> ": patch " <> show (isJust p) <> ", stand-in ran " <> show (isJust seen)
+  | (i, ((range, old), candidate)) <-
+      zip [0 :: Int ..] (zip patchFixtureHoles patchFixtureCandidates)
+  , let at = encName enc <> ", hole " <> show i
+  ]
+
+patchApplyTests :: IO [Bool]
+patchApplyTests = do
+  hPutStrLn stderr "\n── fill_hole's patch, apply, and guarded write (tier 1o: no Agda, #136) ──"
+  injLanes <- injectionOnlyLanes
+  fixture  <- TE.decodeUtf8 <$> BS.readFile patchFixturePath
+  let asText enc   = TE.decodeUtf8 (encodeAs enc fixture)
+      positions t  = [ (hsLine h, hsCol h) | h <- findHoles PlainAgda t ]
+      spans t      = [ DiagRange (hsLine h) (hsCol h) el ec
+                     | h <- findHoles PlainAgda t, let (el, ec) = positionOfOffset t (hsEnd h) ]
+      lineOf n t   = T.concat (take 1 (drop (n - 1) (T.splitOn "\n" t)))
+      firstHole    = (29, 9) :: (Int, Int)
+      missingAgda c = c { agdaBin = "/nonexistent/agda-mcp-136-missing" }
+  sequence $
+    [ -- The digest is compared with one another program computed, so it is
+      -- held to the standard and to that program.
+      runTest "digest: SHA-256 gives the standard's vectors, across both padding boundaries" $ allOf $
+        [ assertEqual "the empty message"
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" (sha256Hex "")
+        , assertEqual "abc"
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" (sha256Hex "abc")
+        , assertEqual "the two-block message"
+            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+            (sha256Hex "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")
+        , assertEqual "a million a's"
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+            (sha256Hex (BS8.replicate 1000000 'a'))
+        ] <>
+        [ assertEqual (show n <> " a's") want (sha256Hex (BS8.replicate n 'a'))
+        | (n, want) <-
+            [ (55,  "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318")
+            , (56,  "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a")
+            , (57,  "f13b2d724659eb3bf47f2dd6af1accc87b81f09f59f2b75e5c0bed6589dfe8c6")
+            , (63,  "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34")
+            , (64,  "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb")
+            , (65,  "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0")
+            , (119, "31eba51c313a5c08226adf18d4a359cfdfd8d2e816b13f4af952f7ea6584dcfb")
+            , (120, "2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c")
+            , (121, "e9615320128cc7a3d6078e9af05603188e5ccbf0d07d8b735d3df5e8e0c1281f")
+            ]
+        ] <>
+        [ assertEqual "sourceDigest's form"
+            "sha256:60c0298fe168be54e4e8731ad5d0f81b9075b6bf6d0b203b39678b5fbfcecaba"
+            (sourceDigest (TE.encodeUtf8 "𝑨 ≡ é\r\n"))
+        ]
+
+    , runTest "digest: agrees with sha256sum on the fixtures, when that program is here" $ do
+        found <- findExecutable "sha256sum"
+        case found of
+          Nothing  -> pure Pass   -- nothing to compare with; the vectors above stand
+          Just exe -> allOf
+            [ do bytes <- BS.readFile file
+                 (code, out, _) <- readProcessWithExitCode exe [file] ""
+                 allOf
+                   [ assertEqual (file <> ": sha256sum ran") ExitSuccess code
+                   , assertEqual file (take 64 out) (T.unpack (sha256Hex bytes))
+                   ]
+            | name <- [ "PatchUnits.agda", "TwoHoles.agda", "LiterateMd.lagda.md"
+                      , "corpus-fixture.jsonl", "fake-slow-agda.sh" ]
+            , let file = "test" </> "resources" </> name
+            ]
+
+    , -- The scan's positions in the four encodings are one list, and it is
+      -- Agda's.
+      runTest "positions: the scan places the fixture's holes where Agda does, in every encoding" $ allOf
+        [ assertEqual (encName enc) (map fst patchFixtureHoles) (spans (asText enc))
+        | enc <- encodings ]
+
+    , runTest "positions: a leading byte-order mark has no column, and is one character of an offset" $
+        let line1  = "module BomLine1 (T : Set) (t : T) (𝑨 : T → T) where x : T ; x = 𝑨 {!!}\n"
+            marked = "\xFEFF" <> line1
+        in case (findHoles PlainAgda line1, findHoles PlainAgda marked) of
+             ([plain], [withMark]) -> allOf
+               [ assertEqual "the same line and column" (hsLine plain, hsCol plain)
+                   (hsLine withMark, hsCol withMark)
+               , assertEqual "the column counts the glyph as one" 67 (hsCol withMark)
+               , assertEqual "the offset counts the mark" (hsStart plain + 1) (hsStart withMark)
+               , assertEqual "the span is still the hole" "{!!}"
+                   (T.take (hsEnd withMark - hsStart withMark) (T.drop (hsStart withMark) marked))
+               , assertEqual "a position resolves to that offset" (Just (hsStart withMark))
+                   (offsetOfPosition 1 (hsCol withMark) marked)
+               , assertEqual "and column 1 is the first character after the mark" (Just 1)
+                   (offsetOfPosition 1 1 marked)
+               ]
+             (a, b) -> pure . Fail $ "expected one hole in each, got " <> show (length a, length b)
+
+    , -- Before #136 the mark was read as the first character of a name, so
+      -- the "--" after it did not open a comment and its hole tokens counted.
+      runTest "holes: a comment that opens a marked file is a comment" $
+        let marked = "\xFEFF-- a comment with {!!} and ? in it\nmodule M where\nx = {!!}\n"
+        in allOf
+             [ assertEqual "one hole, the code's" [(3, 5)] (positions marked)
+             , assertEqual "the code-only view blanks the comment and keeps the mark"
+                 ("\xFEFF" <> T.replicate 34 " ") (lineOf 1 (codeOnly PlainAgda marked))
+             , assertEqual "the mask keeps every character's place"
+                 (T.length marked) (T.length (maskNonCode LiterateMd marked))
+             ]
+
+    , runTest "positions: an offset and its position are inverse, in every encoding" $ allOf
+        [ assertEqual (encName enc <> ": offsets that do not round-trip") []
+            [ o | o <- [first .. T.length t]
+                , let (l, c) = positionOfOffset t o
+                , offsetOfPosition l c t /= Just o ]
+        | enc <- encodings
+        , let t     = asText enc
+              first = if encBom enc then 1 else 0
+        ]
+    ]
+    <>
+    [ runTest ("patch: applied to the original it gives the bytes agda was handed (" <> encName enc <> ")")
+        (patchIsWhatAgdaRead enc)
+    | enc <- encodings ]
+    <>
+    [ -- The control for the unit: the same patch read by a client that counts
+      -- UTF-16 units.  On the last hole the old text is at the wrong place
+      -- too, so nothing warns that client; what it writes is not what was
+      -- checked.
+      runTest "patch: a column read as UTF-16 units patches another hole, and the old text does not warn" $ do
+        t <- fillTrial "utf16" lfEncoding exitsZero id (44, 19) "zero" False True
+        withRight (trResult t) $ \fr -> case (frPatch fr, trSeen t) of
+          (Just p, Just seen) ->
+            let original = TE.decodeUtf8 (trOriginal t)
+            in case (applyByRange CodePoints p original, applyByRange Utf16Units p original) of
+                 (Right right, Right wrong) -> allOf
+                   [ assertEqual "in code points: the second hole, as agda was handed it"
+                       "q = f 𝑨 (f 𝑨 (f ? zero))" (lineOf 44 right)
+                   , assertEqual "and that is the checked text" seen (TE.encodeUtf8 right)
+                   , assertEqual "in UTF-16 units: the first hole"
+                       "q = f 𝑨 (f 𝑨 (f zero ?))" (lineOf 44 wrong)
+                   , assert "which is not the checked text" (TE.encodeUtf8 wrong /= seen)
+                   , assert "and which resultDigest refuses"
+                       (sourceDigest (TE.encodeUtf8 wrong) /= tpResultDigest p)
+                   ]
+                 (a, b) -> pure . Fail $ "expected both readings to find a '?': " <> show (a, b)
+          _ -> pure (Fail "no patch, or the stand-in did not run")
+
+    , runTest "patch: a candidate on two lines; the span, the result, and the re-anchored holes agree" $ do
+        t <- fillTrial "multiline" lfEncoding exitsZero id firstHole "(suc\n      zero)" False True
+        withRight (trResult t) $ \fr -> case (frPatch fr, trSeen t) of
+          (Just p, Just seen) -> allOf
+            [ assertEqual "the range is the hole's, on one line" (DiagRange 29 9 29 13) (tpRange p)
+            , assertEqual "applied by bytes" seen (applyByBytes p (trOriginal t))
+            , assertEqual "applied by line and column" (Right seen)
+                (TE.encodeUtf8 <$> applyByRange CodePoints p (TE.decodeUtf8 (trOriginal t)))
+            , assertEqual "the holes the answer lists are the holes of the patched text"
+                (positions (TE.decodeUtf8 seen)) [ (hiLine h, hiCol h) | h <- frHoles fr ]
+            , assertEqual "each a line lower" [(34, 9), (38, 7), (45, 17), (45, 19)]
+                [ (hiLine h, hiCol h) | h <- frHoles fr ]
+            ]
+          _ -> pure (Fail "no patch, or the stand-in did not run")
+
+    , -- A range may span lines: here the hole does, and a case split's
+      -- clause will (issue #207).  The CR of a CR LF inside it is part of the
+      -- old text and of no column.
+      runTest "patch: a hole written across two lines has a range that ends on its second line" $ allOf
+        [ do let text = "module TwoLines where\nx : Set₁\nx = {! Set\n      !} -- 𝑨\ny = ?\n"
+             t <- trialOn ("twolines-" <> encTag enc) "TwoLines.agda" (encodeAs enc text) exitsZero id $
+                    \cfg file -> handleFillHole cfg FillHoleParams
+                      { fhFilePath = file, fhHole = ByPosition 3 5, fhCandidate = "Set"
+                      , fhApply = False, fhPatch = True }
+             withRight (trResult t) $ \fr -> case (frPatch fr, trSeen t) of
+               (Just p, Just seen) -> allOf
+                 [ assertEqual (encName enc <> ": the range") (DiagRange 3 5 4 9) (tpRange p)
+                 , assertEqual (encName enc <> ": the old text, its line end as the file has it")
+                     (if encCrLf enc then "{! Set\r\n      !}" else "{! Set\n      !}") (tpOldText p)
+                 , assertEqual (encName enc <> ": applied by bytes") seen (applyByBytes p (trOriginal t))
+                 , assertEqual (encName enc <> ": applied by line and column") (Right seen)
+                     (TE.encodeUtf8 <$> applyByRange CodePoints p (TE.decodeUtf8 (trOriginal t)))
+                 , assert (encName enc <> ": the two lines became one")
+                     (TE.encodeUtf8 "x = Set -- 𝑨" `BS.isInfixOf` seen)
+                 , assertEqual (encName enc <> ": the hole below it moved up a line")
+                     [(4, 5)] [ (hiLine h, hiCol h) | h <- frHoles fr ]
+                 ]
+               _ -> pure (Fail "no patch, or the stand-in did not run")
+        | enc <- encodings ]
+
+    , -- A patch says what was tried, whatever came of it: it is on every
+      -- status, and only an ok candidate is ever kept.
+      runTest "apply: a type error restores the file byte for byte, and the patch is still answered" $ do
+        t <- fillTrial "typeerror" lfEncoding exitsWithTypeError id firstHole "zero" True True
+        withRight (trResult t) $ \fr -> allOf
+          [ assertEqual "status" FillTypeError (frStatus fr)
+          , assertEqual "applied" (Just False) (frApplied fr)
+          , assertEqual "the file" (Just (trOriginal t)) (trAfter t)
+          , assertEqual "the patch names what agda was handed"
+              (sourceDigest <$> trSeen t) (tpResultDigest <$> frPatch fr)
+          ]
+
+    , runTest "apply: a timeout restores the file byte for byte" $ do
+        t <- fillTrial "timeout" lfEncoding hangs (\c -> c { agdaTimeout = Just 1 })
+               firstHole "zero" True True
+        withRight (trResult t) $ \fr -> allOf
+          [ assertEqual "status" FillTimeout (frStatus fr)
+          , assertEqual "applied" (Just False) (frApplied fr)
+          , assertEqual "the file" (Just (trOriginal t)) (trAfter t)
+          , assert "the patch is answered" (isJust (frPatch fr))
+          ]
+
+    , runTest "apply: an agda that cannot start restores the file byte for byte" $ do
+        t <- fillTrial "crash" lfEncoding exitsZero missingAgda firstHole "zero" True True
+        withRight (trResult t) $ \fr -> allOf
+          [ assertEqual "status" FillCrash (frStatus fr)
+          , assertEqual "applied" (Just False) (frApplied fr)
+          , assertEqual "the file" (Just (trOriginal t)) (trAfter t)
+          , assertEqual "no agda ran" Nothing (trSeen t)
+          , assert "the patch is answered" (isJust (frPatch fr))
+          ]
+
+    , runTest "apply: an ok candidate stays, and the file holds exactly the bytes agda was handed" $ allOf
+        [ do t <- fillTrial ("kept-" <> encTag enc <> "-" <> label) enc behaviour id
+                    firstHole "(suc 𝑨)" True False
+             withRight (trResult t) $ \fr -> allOf
+               [ assertEqual (at <> ": status") FillOk (frStatus fr)
+               , assertEqual (at <> ": applied") (Just True) (frApplied fr)
+               , assertEqual (at <> ": the file is what agda was handed") (trSeen t) (trAfter t)
+               , assert (at <> ": and it is not the original") (trAfter t /= Just (trOriginal t))
+               , assertEqual (at <> ": no patch was asked for") Nothing (frPatch fr)
+               , assert (at <> ": the verbose echo does not say restored")
+                   ("left in the file" `T.isInfixOf` vEquivalentTo (frVerdict fr)
+                    && not ("restored" `T.isInfixOf` vEquivalentTo (frVerdict fr)))
+               ]
+        | enc <- encodings
+        , (label, behaviour) <- [("exit0", exitsZero), ("holes", exitsWithOpenHoles)]
+        , let at = encName enc <> ", " <> label
+        ]
+
+    , -- The call that asks for nothing new is the call it was: no new key,
+      -- the file restored, the echo's sentence unchanged.
+      runTest "fill_hole: without apply or patch the answer has neither key, and the file is restored" $ do
+        t <- fillTrial "default" lfEncoding exitsZero id firstHole "zero" False False
+        withRight (trResult t) $ \fr -> allOf
+          [ assertEqual "applied" Nothing (frApplied fr)
+          , assertEqual "patch" Nothing (frPatch fr)
+          , assertEqual "no applied key on the wire" Nothing (valueAt ["applied"] (Aeson.toJSON fr))
+          , assertEqual "no patch key on the wire" Nothing (valueAt ["patch"] (Aeson.toJSON fr))
+          , assertEqual "the file" (Just (trOriginal t)) (trAfter t)
+          , assert "the verbose echo says restored"
+              ("(the file on disk is restored afterwards, byte for byte)"
+                 `T.isSuffixOf` vEquivalentTo (frVerdict fr))
+          ]
+
+    , runTest "params: apply and patch default to false, a null is absent, and true is read" $
+        let parse extra = Aeson.fromJSON (Aeson.object
+              ([ "filePath" Aeson..= ("F.agda" :: Text), "candidate" Aeson..= ("x" :: Text) ] <> extra))
+              :: Aeson.Result FillHoleParams
+            flags r = case r of
+              Aeson.Success p -> Right (fhApply p, fhPatch p)
+              Aeson.Error e   -> Left e
+        in allOf
+             [ assertEqual "neither" (Right (False, False)) (flags (parse []))
+             , assertEqual "nulls" (Right (False, False))
+                 (flags (parse ["apply" Aeson..= Aeson.Null, "patch" Aeson..= Aeson.Null]))
+             , assertEqual "apply" (Right (True, False)) (flags (parse ["apply" Aeson..= True]))
+             , assertEqual "patch" (Right (False, True)) (flags (parse ["patch" Aeson..= True]))
+             , assert "a word is refused" (isLeft (flags (parse ["apply" Aeson..= ("yes" :: Text)])))
+             ]
+
+    , -- The other writer.  On each path that writes (the restore, the keep,
+      -- get_goal's restore) the file must be left as that writer left it, and
+      -- the call must not answer as if agda had judged the candidate.
+      runTest "guard: a save during the check is kept, and the call gives no verdict (restore path)" $ do
+        t <- fillTrial "save-restore" lfEncoding (savesOver <> exitsWithTypeError) id
+               firstHole "zero" False False
+        withFileChanged (trResult t) $ \fc -> allOf
+          [ assertEqual "when" ChangedDuringCheck (fchWhen fc)
+          , assertEqual "the file holds the other writer's bytes" (Just savedBytes) (trAfter t)
+          , assertEqual "expected: the bytes the server wrote"
+              (sourceDigest <$> trSeen t) (Just (fchExpected fc))
+          , assertEqual "found: the other writer's" (Just (sourceDigest savedBytes)) (fchFound fc)
+          , assertEqual "the file is named" (trFile t) (fchFile fc)
+          ]
+
+    , runTest "guard: a save during the check is kept, and nothing is applied over it (apply path)" $ do
+        t <- fillTrial "save-apply" lfEncoding (savesOver <> exitsZero) id
+               firstHole "zero" True True
+        withFileChanged (trResult t) $ \fc -> allOf
+          [ assertEqual "when" ChangedDuringCheck (fchWhen fc)
+          , assertEqual "the file holds the other writer's bytes" (Just savedBytes) (trAfter t)
+          ]
+
+    , runTest "guard: get_goal's fallback keeps a save made during its check too" $ do
+        t <- trialWith "save-goal" lfEncoding (savesOver <> exitsZero) id $ \cfg file ->
+               handleGetGoal injLanes cfg GetGoalParams
+                 { ggFilePath = file, ggHole = ByPosition 29 9, ggReload = False
+                 , ggRewrite = editorRewrite }
+        withFileChanged (trResult t) $ \fc -> allOf
+          [ assertEqual "when" ChangedDuringCheck (fchWhen fc)
+          , assertEqual "the file holds the other writer's bytes" (Just savedBytes) (trAfter t)
+          ]
+
+    , -- The control for the one above: with no other writer the fallback
+      -- still restores, so what the guard changed is only what it must.
+      runTest "guard: get_goal's fallback still restores a file nobody else wrote" $ do
+        t <- trialWith "goal-restores" lfEncoding exitsZero id $ \cfg file ->
+               handleGetGoal injLanes cfg GetGoalParams
+                 { ggFilePath = file, ggHole = ByPosition 29 9, ggReload = False
+                 , ggRewrite = editorRewrite }
+        allOf
+          [ assertEqual "the file" (Just (trOriginal t)) (trAfter t)
+          , assert "the macro was what the stand-in was handed"
+              (maybe False ("reportGoalCtx" `BS.isInfixOf`) (trSeen t))
+          , assert "and the stand-in printed no goal, so the call fails as it always did"
+              (either (("Could not parse goal/context markers" `T.isInfixOf`) . failureText)
+                      (const False) (trResult t))
+          ]
+
+    , runTest "guard: a file moved away during the check is not put back" $ do
+        t <- fillTrial "moved" lfEncoding (movesAway <> exitsZero) id firstHole "zero" True False
+        withFileChanged (trResult t) $ \fc -> allOf
+          [ assertEqual "when" ChangedDuringCheck (fchWhen fc)
+          , assertEqual "nothing was found" Nothing (fchFound fc)
+          , assertEqual "the file is still gone" Nothing (trAfter t)
+          ]
+
+    , runTest "guard: a file changed since it was read is not written, and agda is not run" $ do
+        t <- trialWith "changed-before" lfEncoding exitsZero id $ \cfg file -> do
+               -- The caller read these bytes; the file has moved on since.
+               let stale = "module Stale where\n"
+               r <- runInPlace cfg file stale "module Patched where\n" (const True)
+               pure (either (Left . FailFileChanged) Right r)
+        withFileChanged (trResult t) $ \fc -> allOf
+          [ assertEqual "when" ChangedBeforeCheck (fchWhen fc)
+          , assertEqual "the file is as it was" (Just (trOriginal t)) (trAfter t)
+          , assertEqual "no agda ran" Nothing (trSeen t)
+          , assertEqual "expected: what the caller read"
+              (sourceDigest "module Stale where\n") (fchExpected fc)
+          , assertEqual "found: what the file holds" (Just (sourceDigest (trOriginal t))) (fchFound fc)
+          ]
+
+    , -- The third way a check ends: the call is cancelled while agda runs (a
+      -- client that gave up, a server shutting down).  The patch must not
+      -- outlive the call, apply or not.
+      runTest "guard: a call cancelled while agda runs restores the file, apply or not" $ do
+        t <- trialWith "cancelled" lfEncoding hangs id $ \cfg file -> do
+               r <- timeout 500000 $ handleFillHole cfg FillHoleParams
+                      { fhFilePath = file, fhHole = ByPosition 29 9, fhCandidate = "zero"
+                      , fhApply = True, fhPatch = False }
+               pure (fromMaybe (Left (FailMessage "cancelled")) r)
+        allOf
+          [ assertEqual "the call was cancelled, not answered" (Left "cancelled")
+              (either (Left . failureText) (const (Right ())) (trResult t))
+          , assert "agda had been handed the patched text"
+              (isJust (trSeen t) && trSeen t /= Just (trOriginal t))
+          , assertEqual "the file" (Just (trOriginal t)) (trAfter t)
+          ]
+
+    , runTest "guard: the failure a client reads names the file, the moment, and both texts" $
+        let fc = FileChanged "/abs/F.agda" ChangedDuringCheck "sha256:aa" (Just "sha256:bb")
+            v  = Aeson.toJSON fc
+        in allOf
+             [ assertEqual "file" (Just (Aeson.String "/abs/F.agda")) (valueAt ["fileChanged", "file"] v)
+             , assertEqual "when" (Just (Aeson.String "during the check")) (valueAt ["fileChanged", "when"] v)
+             , assertEqual "expected" (Just (Aeson.String "sha256:aa")) (valueAt ["fileChanged", "expected"] v)
+             , assertEqual "found" (Just (Aeson.String "sha256:bb")) (valueAt ["fileChanged", "found"] v)
+             , assert "the sentence says no verdict is given"
+                 (maybe False (\e -> case e of
+                                       Aeson.String m -> "No verdict is given" `T.isInfixOf` m
+                                       _              -> False)
+                        (valueAt ["error"] v))
+             , assertEqual "a file that could not be read has no found key" Nothing
+                 (valueAt ["fileChanged", "found"]
+                    (Aeson.toJSON fc { fchFound = Nothing }))
+             ]
+
+    , -- What a client is shown.  The schema declares an argument exactly
+      -- where the server honors it.
+      runTest "surface: fill_hole declares apply and patch, optional; --no-apply declares no apply and promises none" $
+        let refusing    = corpusConfig { scNoApply = True }
+            propsOf cfg = case KM.lookup "properties" (inputSchemaOf "fill_hole" (toolDefinitions cfg)) of
+              Just (Aeson.Object props) -> map Key.toText (KM.keys props)
+              _                         -> []
+            descOf cfg  = descriptionOf "fill_hole" (toolDefinitions cfg)
+            required    = fromMaybe [] (requiredOf (inputSchemaOf "fill_hole" corpusTools))
+        in allOf
+             [ assert "apply is declared" ("apply" `elem` propsOf corpusConfig)
+             , assert "patch is declared" ("patch" `elem` propsOf corpusConfig)
+             , assert "neither is required" (all (`notElem` required) ["apply", "patch"])
+             , assert "the description says what apply does"
+                 ("apply:true instead keeps a candidate" `T.isInfixOf` descOf corpusConfig)
+             , assert "and that the splice adds nothing"
+                 ("no parentheses are added" `T.isInfixOf` descOf corpusConfig)
+             , assert "--no-apply: no apply property" ("apply" `notElem` propsOf refusing)
+             , assert "--no-apply: patch is still declared" ("patch" `elem` propsOf refusing)
+             , assert "--no-apply: the description promises no apply"
+                 (not ("apply" `T.isInfixOf` descOf refusing))
+             , assert "--no-apply: it says the candidate is written back by the caller"
+                 ("you write back yourself" `T.isInfixOf` descOf refusing)
+             , assertEqual "both descriptions fit what a client reads" []
+                 [ T.length d | d <- [descOf corpusConfig, descOf refusing], T.length d > clientCap ]
+             , assert "the unit is stated where every position is, in the instructions"
+                 ("col in code points" `T.isInfixOf` serverInstructions corpusConfig)
+             ]
+    ]
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 2k: fill_hole's patch and apply against real Agda (issue #136)
+--
+-- Tier 1o holds a patch to the bytes a stand-in was handed; this tier holds
+-- its positions to Agda.  For each encoding of the fixture the lane is asked
+-- where its interaction points are, start and end, and the scan and every
+-- patch must say the same; then real candidates are applied, one hole after
+-- another by the positions each answer re-anchors, until batch Agda passes
+-- the file; and the lane is shown to follow an applied candidate.
+-- ---------------------------------------------------------------------------
+
+patchApplyIntegrationTests :: AgdaConfig -> IO [Bool]
+patchApplyIntegrationTests cfg = do
+  hPutStrLn stderr "\n── fill_hole's patch and apply against Agda (tier 2k: #136, Agda subprocess) ──"
+  fixture <- TE.decodeUtf8 <$> BS.readFile patchFixturePath
+  let copyAs label bytes name = do
+        dir <- scratchDir ("patch-real-" <> label)
+        let file = dir </> name
+        BS.writeFile file bytes
+        pure file
+      fixtureAs label enc = copyAs label (encodeAs enc fixture) "PatchUnits.agda"
+      -- Where Agda's interaction points are, each with its end.
+      agdaSpans :: FilePath -> IO (Either String [DiagRange])
+      agdaSpans file = do
+        lanes <- newInteractionLanes
+        out <- withLane lanes cfg (takeDirectory file) $ \lh -> do
+          loaded <- ensureLoaded lh False file (agdaFlags cfg <> ["-i", takeDirectory file])
+          pure $ case loaded of
+            Left lf  -> Left (T.unpack (lfMessage lf))
+            Right lr -> case lrOutcome lr of
+              Left msg -> Left (T.unpack msg)
+              Right li -> Right
+                [ DiagRange (irLine r) (irCol r) (irEndLine r) (irEndCol r)
+                | p <- liPoints li, Just r <- [ipRange p] ]
+        shutdownLanes lanes
+        pure (either (Left . T.unpack . lfMessage) id out)
+      fill file (line, col) candidate apply patch = handleFillHole cfg FillHoleParams
+        { fhFilePath = file, fhHole = ByPosition line col, fhCandidate = candidate
+        , fhApply = apply, fhPatch = patch }
+      goalAt lanes file (line, col) = handleGetGoal lanes cfg GetGoalParams
+        { ggFilePath = file, ggHole = ByPosition line col, ggReload = False
+        , ggRewrite = editorRewrite }
+      checked lanes file = handleCheckFile lanes cfg (CheckFileParams file Nothing)
+      startOf r = (rngStartLine r, rngStartCol r)
+  spanTests <- sequence
+    [ runTest ("patch: every hole is spanned where Agda places it (" <> encName enc <> ")") $ do
+        file  <- fixtureAs ("spans-" <> encTag enc) enc
+        orig  <- BS.readFile file
+        spans <- agdaSpans file
+        case spans of
+          Left why -> pure (Fail ("the lane did not load the fixture: " <> why))
+          Right fromAgda -> allOf $
+            [ assertEqual "Agda's interaction points are the fixture's five holes"
+                (map fst patchFixtureHoles) fromAgda ]
+            <>
+            [ do r <- fill file (startOf range) "zero" False True
+                 withRight r $ \fr -> allOf
+                   [ assertEqual ("hole " <> show i <> ": status") FillOk (frStatus fr)
+                   , assertEqual ("hole " <> show i <> ": the patch's range is Agda's")
+                       (Just range) (tpRange <$> frPatch fr)
+                   , assertEqual ("hole " <> show i <> ": the range holds the hole")
+                       (Just old) (tpOldText <$> frPatch fr)
+                   ]
+            | (i, (range, old)) <- zip [0 :: Int ..] (zip fromAgda (map snd patchFixtureHoles)) ]
+            <>
+            [ do after <- BS.readFile file
+                 assertEqual "five checks later the file is as it was" orig after ]
+    | enc <- encodings ]
+
+  rest <- sequence
+    [ -- The one place a byte-order mark moves a column: line 1.
+      runTest "patch: a hole on line 1 after a byte-order mark is where Agda places it, and applies" $ do
+        let line1 = "module BomLine1 (T : Set) (t : T) (𝑨 : T → T) where x : T ; x = 𝑨 {!!}\n"
+            bytes = utf8Bom <> TE.encodeUtf8 line1
+        file  <- copyAs "bom-line1" bytes "BomLine1.agda"
+        spans <- agdaSpans file
+        case spans of
+          Right [range] -> do
+            r     <- fill file (startOf range) "t" True True
+            after <- BS.readFile file
+            withRight r $ \fr -> allOf
+              [ assertEqual "Agda's span, the mark uncounted" (DiagRange 1 67 1 71) range
+              , assertEqual "the patch's range is Agda's" (Just range) (tpRange <$> frPatch fr)
+              , assertEqual "the bytes count the mark and the glyph"
+                  (Just (BS.length (utf8Bom <> TE.encodeUtf8 (T.takeWhile (/= '{') line1))))
+                  (tpByteStart <$> frPatch fr)
+              , assertEqual "status" FillOk (frStatus fr)
+              , assertEqual "exit code: nothing is left open" 0 (vExitCode (frVerdict fr))
+              , assertEqual "applied" (Just True) (frApplied fr)
+              , assertEqual "the file keeps its mark and gains the candidate"
+                  (utf8Bom <> TE.encodeUtf8 (T.replace "{!!}" "t" line1)) after
+              ]
+          other -> pure (Fail ("expected one interaction point, got " <> show other))
+
+    , -- The loop the issue exists for: each answer's hole list is the next
+      -- address, no hole is written back by hand, and the file that results
+      -- passes the batch check.
+      runTest "apply: five holes filled in turn by re-anchored positions, and the file then checks" $ do
+        file <- fixtureAs "chain" lfEncoding
+        let step :: Int -> (Int, Int) -> IO (Either String Int)
+            step n at
+              | n > 5     = pure (Left "more fills than the fixture has holes")
+              | otherwise = do
+                  r <- fill file at "zero" True False
+                  case r of
+                    Left err -> pure (Left (T.unpack (failureText err)))
+                    Right fr
+                      | frStatus fr /= FillOk || frApplied fr /= Just True ->
+                          pure (Left ("fill " <> show n <> ": " <> show (frStatus fr, frApplied fr)))
+                      | otherwise -> case frHoles fr of
+                          []      -> pure (Right n)
+                          (h : _) -> step (n + 1) (hiLine h, hiCol h)
+        fills   <- step 1 (29, 9)
+        injLanes <- injectionOnlyLanes
+        final   <- checked injLanes file
+        text    <- TE.decodeUtf8 <$> BS.readFile file
+        allOf
+          [ assertEqual "five fills, each ok and applied" (Right 5) fills
+          , assertEqual "no hole is left in the file" [] (findHoles PlainAgda text)
+          , assert "the glyph's lines hold the candidates"
+              (all (`T.isInfixOf` text) ["g = f 𝑨 zero", "h = f 𝑨 zero", "k = f zero 𝑨", "(f zero zero)"])
+          , withRight final $ \fcr -> allOf
+              [ assert "batch agda passes the file" (fcrSuccess fcr)
+              , assertEqual "exit code" 0 (vExitCode (fcrVerdict fcr))
+              ]
+          ]
+
+    , runTest "apply: a candidate Agda refuses is not kept, and the file is restored byte for byte" $ do
+        file  <- fixtureAs "refused" lfEncoding
+        orig  <- BS.readFile file
+        r     <- fill file (29, 9) "suc" True False
+        after <- BS.readFile file
+        withRight r $ \fr -> allOf
+          [ assertEqual "status" FillTypeError (frStatus fr)
+          , assertEqual "applied" (Just False) (frApplied fr)
+          , assertEqual "the file" orig after
+          ]
+
+    , -- The issue's first design point.  The lane keeps the load it made; an
+      -- apply changes the file under it.  Nothing in the batch path tells the
+      -- lane (decision 3: a batch tool never calls one); the lane's own stamp
+      -- of the file's bytes must make the next question re-load, and the
+      -- batch tools' peek must stop vouching for the old load meanwhile.
+      runTest "lane: after an apply the peek stops vouching, and the next lane call re-loads the new text" $ do
+        file  <- fixtureAs "lane" lfEncoding
+        lanes <- newInteractionLanes
+        g1 <- goalAt lanes file (33, 9)
+        c1 <- checked lanes file
+        a  <- fill file (29, 9) "zero" True False
+        c2 <- checked lanes file
+        g2 <- goalAt lanes file (33, 9)
+        c3 <- checked lanes file
+        shutdownLanes lanes
+        let loadOf g   = either (Left . T.unpack . failureText) (Right . fmap lchLoad . giLane) g
+            goalsOf' c = either (Left . T.unpack . failureText) (Right . map hiGoal . fcrHoles) c
+        allOf
+          [ assertEqual "first question: the lane loads the file" (Right (Just "first")) (loadOf g1)
+          , assertEqual "the peek then fills every hole's goal"
+              (Right (replicate 5 "Nat")) (goalsOf' c1)
+          , withRight a $ \fr -> assertEqual "the candidate is applied" (Just True) (frApplied fr)
+          , assertEqual "after the apply the old load is not vouched for: four holes, no goals"
+              (Right (replicate 4 "?")) (goalsOf' c2)
+          , assertEqual "the next lane call re-loads, and says why" (Right (Just "changed")) (loadOf g2)
+          , withRight g2 $ \gi -> assertEqual "and answers about the file as applied" "Nat" (giGoal gi)
+          , assertEqual "the new load is vouched for: four holes, with goals"
+              (Right (replicate 4 "Nat")) (goalsOf' c3)
+          ]
+    ]
+  pure (spanTests <> rest)
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 2l: --no-apply on the wire (issue #136)
+--
+-- The operator's refusal, through the real executable: the flag takes apply
+-- out of the schema, and a call that passes it anyway is refused by name
+-- before the server looks at the file.
+-- ---------------------------------------------------------------------------
+
+noApplyProcessTests :: FilePath -> IO [Bool]
+noApplyProcessTests exe = do
+  hPutStrLn stderr "\n── Process tests (tier 2l: --no-apply on the wire, #136) ──"
+  let reqs = unlines
+        [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"fill_hole\",\"arguments\":{\"filePath\":\"/nonexistent/X.agda\",\"candidate\":\"x\",\"apply\":true}}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"fill_hole\",\"arguments\":{\"filePath\":\"/nonexistent/X.agda\",\"candidate\":\"x\",\"patch\":true}}}"
+        ]
+      propsIn out = case resultOf 2 out >>= KM.lookup "tools" of
+        Just ts -> case KM.lookup "properties" (inputSchemaOf "fill_hole" ts) of
+          Just (Aeson.Object props) -> map Key.toText (KM.keys props)
+          _                         -> []
+        Nothing -> []
+  (onCode, onOut, onErr)    <- readProcessWithExitCode exe [] reqs
+  (offCode, offOut, offErr) <- readProcessWithExitCode exe ["--no-apply"] reqs
+  sequence
+    [ runTest "wire: both sessions ran and exited cleanly" $ allOf
+        [ assertEqual ("by default (stderr: " <> take 300 onErr <> ")") ExitSuccess onCode
+        , assertEqual ("with --no-apply (stderr: " <> take 300 offErr <> ")") ExitSuccess offCode
+        ]
+
+    , runTest "wire: by default apply is declared, and a call that passes it reaches the file" $ allOf
+        [ assert "declared" ("apply" `elem` propsIn onOut)
+        , assert "the path is what is refused"
+            (maybe False ("/nonexistent/X.agda" `T.isInfixOf`) (innerText 3 onOut))
+        , assert "the startup log says so" ("fill_hole apply: on request" `isInfixOf` onErr)
+        ]
+
+    , runTest "wire: with --no-apply, apply is not declared and is refused by name; patch is not" $ allOf
+        [ assert "not declared" ("apply" `notElem` propsIn offOut)
+        , assert "patch is declared" ("patch" `elem` propsIn offOut)
+        , assert "refused by name, before the file is looked at"
+            (maybe False (\t -> "--no-apply" `T.isInfixOf` t && not ("/nonexistent" `T.isInfixOf` t))
+                   (innerText 3 offOut))
+        , assert "a call with patch alone goes on to the file"
+            (maybe False ("/nonexistent/X.agda" `T.isInfixOf`) (innerText 4 offOut))
+        , assert "the startup log says so" ("fill_hole apply: refused (--no-apply)" `isInfixOf` offErr)
+        ]
+    ]
+
+
 main :: IO ()
 main = do
   hPutStrLn stderr "agda-mcp test suite"
@@ -10379,8 +11212,14 @@ main = do
   stampResults <- agdaStampTests
   -- Tier 1n: the output tail of a failure nothing explains (#346), no Agda.
   silentResults <- silentFailureTests
+  -- Tier 1o: fill_hole's patch, its apply, and the guarded write (#136), no Agda.
+  patchResults <- patchApplyTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
-  mEnv <- probeAgdaEnv
+  -- AGDA_MCP_TEST_NO_AGDA, set to anything, skips them as a machine without
+  -- Agda would: the tiers above then run alone, in about a minute instead of
+  -- ten, which is what a probe of one of them needs.
+  noAgda <- isJust <$> lookupEnv "AGDA_MCP_TEST_NO_AGDA"
+  mEnv <- if noAgda then pure Nothing else probeAgdaEnv
   integrationResults <- case mEnv of
     Nothing           -> do
       hPutStrLn stderr "\n── Integration tests (tier 2): SKIPPED ──"
@@ -10449,16 +11288,32 @@ main = do
       hPutStrLn stderr "\n── lane restart (tier 3d: #347): SKIPPED ──"
       pure []
     Just (cfg, _fixture, repoRoot) -> laneRestartTests cfg repoRoot
+  -- Tier 2k: fill_hole's patch and apply against real Agda (#136), same gate
+  -- as tier 2.  It runs here, after the lane tiers, because its last test
+  -- starts lanes of its own.
+  patchAgdaResults <- case mEnv of
+    Nothing -> do
+      hPutStrLn stderr "\n── fill_hole's patch and apply against Agda (tier 2k: #136): SKIPPED ──"
+      pure []
+    Just (cfg, _fixture, _repoRoot) -> patchApplyIntegrationTests cfg
+  -- Tier 2l: --no-apply on the wire (#136), same gate as tier 2g.
+  noApplyWireResults <- case mExe of
+    Nothing -> do
+      hPutStrLn stderr
+        "\n── Process tests (tier 2l: --no-apply, #136): SKIPPED (executable not built or cabal absent) ──"
+      pure []
+    Just exe -> noApplyProcessTests exe
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults <> writtenResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
           <> pathResults <> wireResults <> scopeResults <> leanResults <> surfaceResults
           <> declResults <> autoResults <> stampResults <> silentResults
+          <> patchResults
           <> integrationResults <> cwdResults <> leanWireResults <> exposeWireResults
           <> autoWireResults
           <> laneResults <> definitionResults <> scopeLaneResults <> autoLaneResults
-          <> restartResults
+          <> restartResults <> patchAgdaResults <> noApplyWireResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

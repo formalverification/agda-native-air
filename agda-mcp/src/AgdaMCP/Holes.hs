@@ -42,6 +42,25 @@
 --   no address at all, reaches it, because there is no other hole to guess, and
 --   the resolution says which rule applied.
 --
+--   Positions count as Agda counts them (issue #136, where a position became
+--   something a client edits by).  A line and a column are 1-based; a line
+--   ends at LF, so the CR of a CR LF pair is the last character of its line
+--   and no column reaches it; a column counts Unicode code points, so an
+--   astral glyph such as @𝑨@ is one column (two UTF-16 units, four UTF-8
+--   bytes) and so is a wide character or a tab; and a leading byte-order mark
+--   is no part of the text, because Agda drops it before it reads
+--   (@Agda.Utils.IO.UTF8.readTextFile@): 'bomSplit' takes it off before any
+--   scan, and every offset reported is still an offset into the text as
+--   given, the mark included.  Measured against batch Agda 2.9.0 on LF,
+--   CR LF, marked, and marked CR LF copies of one module, the hole positions
+--   agree; before 'bomSplit' the scan put a hole on line 1 of a marked file
+--   one column right, and read a @--@ comment that opens such a file as code,
+--   counting its hole tokens.  One difference from Agda remains and is stated
+--   rather than hidden: Agda also ends a line at a lone CR, a form feed, NEL,
+--   LS and PS, and this scan does not, so after one of those its line numbers
+--   are one short of Agda's (they are an Emacs buffer's, which does not break
+--   a line there either; issue #369).
+--
 --   The functions here are pure; AgdaMCP.Tools.ProofState combines them with
 --   the Agda subprocess layer in AgdaMCP.Agda.  The long-term plan (issue
 --   #75) is to make Agda's interaction protocol the source of truth for live
@@ -63,18 +82,21 @@ module AgdaMCP.Holes
   , HoleSpan (..)
   , findHoles
   , findNthHole
+  , bomSplit
     -- * Hole addressing (issue #79)
   , HoleRef (..)
   , ResolvedBy (..)
   , resolvedByText
   , ResolvedHole (..)
   , offsetOfPosition
+  , positionOfOffset
   , holeIndexAtOffset
   , resolveHoleRef
   , describeHole
     -- * Splicing
   , substituteHole
   , injectReportExpr
+  , spliceSpan
   ) where
 
 import Data.Char (isAlphaNum, isSpace, toLower)
@@ -126,9 +148,28 @@ flavourOf path
 -- character position (the same trick as Agda's @illiterate@: non-code
 -- characters become spaces, except newlines and other non-tab whitespace,
 -- which are kept so line/column bookkeeping is unaffected).  For 'PlainAgda'
--- this is the identity.
+-- this is the identity.  A leading byte-order mark is kept where it was and is
+-- never read as prose or as a marker's first character: Agda has dropped it
+-- before its own literate layer runs.
 maskNonCode :: LiterateFlavour -> Text -> Text
-maskNonCode flav src = case flav of
+maskNonCode flav src = mark <> maskBody flav body
+  where (mark, body) = bomSplit src
+
+-- | bomSplit: a leading byte-order mark (U+FEFF), and the text after it.
+--
+-- Agda strips the mark from a file's bytes before it decodes them, so the
+-- text Agda reads, and every position Agda reports, starts after it.  Each
+-- scan in this module runs on the second component and shifts its offsets by
+-- the length of the first (one character, or none), which keeps a line-1
+-- column Agda's and an offset the given text's.
+bomSplit :: Text -> (Text, Text)
+bomSplit t = case T.uncons t of
+  Just ('\xFEFF', rest) -> (T.singleton '\xFEFF', rest)
+  _                     -> (T.empty, t)
+
+-- | maskBody: 'maskNonCode' of a text with no leading byte-order mark.
+maskBody :: LiterateFlavour -> Text -> Text
+maskBody flav src = case flav of
   PlainAgda    -> src
   LiterateTeX  -> fromLines (texLayers   (toLines src))
   LiterateMd   -> fromLines (mdLayers    (toLines src))
@@ -511,10 +552,15 @@ lexSpans = scan 0 1 1 True
 -- never counted.
 findHoles :: LiterateFlavour -> Text -> [HoleSpan]
 findHoles flav src =
-  [ HoleSpan (lxStart s) (lxEnd s) (lxLine s) (lxCol s)
-  | s <- lexSpans (maskNonCode flav src)
+  [ HoleSpan (lxStart s + skip) (lxEnd s + skip) (lxLine s) (lxCol s)
+  | s <- lexSpans (maskBody flav body)
   , lxKind s == LexHole
   ]
+  where
+    -- Lines and columns are counted in the text Agda reads, offsets in the
+    -- text as given; see 'bomSplit'.
+    (mark, body) = bomSplit src
+    skip         = T.length mark
 
 -- | codeOnly: the source with everything that is not Agda code blanked out —
 -- literate prose ('maskNonCode') and comment and pragma text (the lexical
@@ -538,9 +584,10 @@ findHoles flav src =
 -- it reads the same scan.  String literals stay, being code Agda does parse.
 codeOnly :: LiterateFlavour -> Text -> Text
 codeOnly flav src =
-  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked ]
+  mark <> blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked ]
   where
-    masked = maskNonCode flav src
+    (mark, body) = bomSplit src
+    masked       = maskBody flav body
 
 -- | codeWithHoles: 'codeOnly' with the holes left in place: literate prose,
 -- comments, and pragmas blanked, every character position preserved.
@@ -551,9 +598,10 @@ codeOnly flav src =
 -- 'codeOnly' would make it blank and let a declaration's last line vanish.
 codeWithHoles :: LiterateFlavour -> Text -> Text
 codeWithHoles flav src =
-  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked, lxKind s /= LexHole ]
+  mark <> blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked, lxKind s /= LexHole ]
   where
-    masked = maskNonCode flav src
+    (mark, body) = bomSplit src
+    masked       = maskBody flav body
 
 -- | blankSpans: 'bleach' the given character ranges of a text, keeping the
 -- rest.  The ranges must be ascending and non-overlapping, which is how
@@ -648,11 +696,17 @@ data ResolvedHole = ResolvedHole
 -- A column one past a line's last character is accepted — that is where a
 -- line's end sits, and it is a position Agda itself prints in ranges — but a
 -- column beyond it is a miss rather than a silent clamp onto the next line.
+--
+-- The position is counted as Agda counts it and the offset is into the text as
+-- given: a leading byte-order mark has no column, and is one character of the
+-- offset ('bomSplit').
 offsetOfPosition :: Int -> Int -> Text -> Maybe Int
 offsetOfPosition line col src
   | line < 1 || col < 1 = Nothing
-  | otherwise           = go (line - 1) 0 src
+  | otherwise           = (+ T.length mark) <$> go (line - 1) 0 body
   where
+    (mark, body) = bomSplit src
+
     go :: Int -> Int -> Text -> Maybe Int
     go 0 !off rest
       | col <= T.length (T.takeWhile (/= '\n') rest) + 1 = Just (off + col - 1)
@@ -660,6 +714,23 @@ offsetOfPosition line col src
     go !n !off rest = case T.breakOn "\n" rest of
       (_, r) | T.null r -> Nothing          -- the text has fewer lines than that
       (l, r)            -> go (n - 1) (off + T.length l + 1) (T.drop 1 r)
+
+-- | positionOfOffset: the 1-based @(line, column)@ of a 0-based character
+-- offset into a text, the inverse of 'offsetOfPosition' on every offset from
+-- the text's first character (the one after a byte-order mark) to its length
+-- (the suite checks the round trip).
+--
+-- It is how a span that is not a hole's start gets its position: a hole's end,
+-- and later a clause's two ends (issue #207).  The offset of a leading
+-- byte-order mark itself has no position in the text Agda reads; it answers
+-- @(1, 1)@, where the text begins.  An offset past the end answers the end's
+-- position.
+positionOfOffset :: Text -> Int -> (Int, Int)
+positionOfOffset src off = (1 + T.count "\n" before, 1 + T.length lastLine)
+  where
+    (mark, body) = bomSplit src
+    before       = T.take (max 0 (off - T.length mark)) body
+    lastLine     = T.takeWhileEnd (/= '\n') before
 
 -- | The index of the hole whose span covers an offset: @start <= off < end@, so
 -- a position at the hole's first character counts and one past its last does
@@ -794,7 +865,12 @@ injectReportExpr rexpr flav n src = do
   hole <- findNthHole flav n src
   pure (spliceSpan hole (rexpr <> " ?") src)
 
--- | Splice a replacement over a hole's exact span.
+-- | Splice a replacement over a hole's exact span, and add nothing: no
+-- parentheses, no spaces.  Agda's own give parenthesizes a term when the
+-- hole's place needs it; this does not, so a candidate @f x@ for the hole of
+-- @g {!!}@ is checked, and by an apply or a patch written, as @g f x@.  That
+-- is the point of it: the text a verdict is about is exactly the text the
+-- caller sent (issue #136).
 spliceSpan :: HoleSpan -> Text -> Text -> Text
 spliceSpan hole replacement src =
   let (before, rest) = T.splitAt (hsStart hole) src

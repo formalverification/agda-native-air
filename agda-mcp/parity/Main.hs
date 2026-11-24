@@ -466,7 +466,7 @@ runObligation lanes cfg0 oblRel cs = do
           pure (ms, ps, as)
       -- Batch pass: the shipped handler, one cold agda per candidate.
       batchAnswers <- forM cs $ \c ->
-        handleFillHole cfg0 (FillHoleParams absPath (ByIndex (caseHole c)) (caseCand c))
+        handleFillHole cfg0 (FillHoleParams absPath (ByIndex (caseHole c)) (caseCand c) False False)
       pure
         [ row c loadMs points (indexPoint (caseHole c) points) lane batch
         | (c, lane, batch) <- zip3 cs laneAnswers batchAnswers ]

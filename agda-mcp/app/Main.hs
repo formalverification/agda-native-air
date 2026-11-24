@@ -24,7 +24,7 @@
 --   agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 --            [--corpus PATH]  [--timeout N] [--verbose]
 --            [--check-command "CMD ARGS ..."] [--check-timeout N]
---            [--expose NAME,NAME,...] [--auto]
+--            [--expose NAME,NAME,...] [--auto] [--no-apply]
 --            [--agda-identity-command "CMD ARGS ..."] [--agda-identity-ttl N]
 --
 -- M1-3 additions:
@@ -45,6 +45,14 @@
 --                   at a hole).  Off by default: a place on the default
 --                   surface waits for an arm that shows an agent using it
 --                   (ADR 0002, decision 25).
+--
+-- Issue #136 addition:
+--   --no-apply      Refuse fill_hole's apply: the server then restores every
+--                   file it patches, whatever a call asks, its schema declares
+--                   no apply, and a call that passes one is refused by name.
+--                   For a registration beside an editor, whose buffer a
+--                   server must not write under; fill_hole's patch is what
+--                   such a client applies itself.
 --
 -- Issue #242 addition:
 --   --cwd DIR       Optional, and documented as such: without it the server
@@ -101,6 +109,7 @@ data CliOpts = CliOpts
   , cliCwd        :: Maybe FilePath
   , cliExpose     :: Maybe [String]
   , cliAuto       :: Bool
+  , cliNoApply    :: Bool
   } deriving (Show)
 
 defaultCliOpts :: CliOpts
@@ -111,6 +120,7 @@ defaultCliOpts = CliOpts
   , cliCwd        = Nothing
   , cliExpose     = Nothing
   , cliAuto       = False
+  , cliNoApply    = False
   }
 
 
@@ -175,6 +185,7 @@ main = do
         , scCorpusIndex = corpusIdx
         , scExpose      = map T.pack <$> cliExpose opts
         , scAuto        = cliAuto opts
+        , scNoApply     = cliNoApply opts
         }
   -- --expose names tools of THIS configuration (issue #191): a name it does
   -- not register would otherwise present a smaller surface than asked for,
@@ -213,6 +224,7 @@ main = do
     _                -> "(none; the lanes compare --agda-bin's real path and contents)"
   hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
   hPutStrLn stderr $ "  auto: " <> if cliAuto opts then "registered" else "(not registered; --auto)"
+  hPutStrLn stderr $ "  fill_hole apply: " <> if cliNoApply opts then "refused (--no-apply)" else "on request (apply: true)"
   hPutStrLn stderr $ "  exposed: " <> maybe "(every registered tool but search_in_scope, which --expose can name)" (T.unpack . T.intercalate ",") (scExpose serverCfg)
   hPutStrLn stderr   "  transport: stdio"
   hPutStrLn stderr   "  Waiting for MCP client..."
@@ -232,6 +244,7 @@ main = do
 --   --check-timeout N     Per-project-check timeout in seconds (default: 1800; 0 = none).
 --   --expose NAMES        Present only these tools, comma-separated (issue #191).
 --   --auto                Register the auto tool (issue #205).
+--   --no-apply            Refuse fill_hole's apply; restore every patched file (issue #136).
 --   --agda-identity-command "..."  What names the Agda --agda-bin would start (issue #347).
 --   --agda-identity-ttl N Seconds its output stands (default: 2; 0 = every call).
 --   --verbose             Emit debug output to stderr.
@@ -269,6 +282,8 @@ parseArgs ("--expose" : names : rest) opts =
   parseArgs rest opts { cliExpose = Just (filter (not . null) (map T.unpack (map T.strip (T.splitOn "," (T.pack names))))) }
 parseArgs ("--auto" : rest) opts =
   parseArgs rest opts { cliAuto = True }
+parseArgs ("--no-apply" : rest) opts =
+  parseArgs rest opts { cliNoApply = True }
 -- The identity command (issue #347), split on whitespace and run with no
 -- shell, as --check-command is: nothing this server wraps around it can
 -- change what it prints.
@@ -337,6 +352,10 @@ usage = unlines
   , "  --auto                Register the auto tool: Agda's own proof search"
   , "                        (Mimer, an editor's C-c C-a) at a hole, answering"
   , "                        a candidate term.  Off by default."
+  , "  --no-apply            Refuse fill_hole's apply: restore every patched"
+  , "                        file whatever a call asks, declare no apply in the"
+  , "                        schema, and refuse by name a call that passes one."
+  , "                        For a registration beside an editor."
   , "  --agda-identity-command \"...\""
   , "                        A command whose standard output names the Agda"
   , "                        that --agda-bin would start, for what the binary's"
