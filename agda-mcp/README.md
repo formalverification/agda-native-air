@@ -321,6 +321,7 @@ One lexical scan serves the scans that are not about holes, too.  The `AgdaDojan
 +  `involved.metas` is the one payload that does not come from the prose (issue #115).  Agda names its unsolved metas by location and never prints their types, so the § 5 corpus's last ask — each meta with its type — is unanswerable from a batch run; a load on the interaction lane lists every meta with its name, type, and range instead.  `check_file` and `get_diagnostics` therefore hand the unsolved-meta diagnostics (`[UnsolvedMetaVariables]` and its `[UnsolvedConstraints]` sibling, whose constraint text names those very metas) a `metas: [{name, type, range}]` list from a warm lane's stored load — the same free peek that fills the hole listings' `goal` fields, never a lane call — and omit it when the lane is cold or its recorded load no longer describes the file's current bytes.  `metaTypes` is unaffected either way: it is what Agda's own prose said, and a client reading it keeps working.
 +  Diagnostics are ordered **most likely root cause first**: unresolvable-file errors, then the scope warnings that precede a hard error (`ModuleDoesntExport` before the `NotInScope` it causes), then scope errors, then type errors, then unsolved metas and constraints, then remaining warnings.  The sort is stable, so Agda's own order survives within a rank.
 +  The list is capped by the optional `maxDiagnostics` argument (default 10; `0` means no limit), and `diagnosticsTotal` always reports how many were found before the cap, so a broken import list cannot return a hundred cascading errors, and a truncated list is never mistaken for a short one.  `get_diagnostics`' `errors` and `warnings` counts are over *every* diagnostic found, not over the capped list.
++  A failure that leaves the list empty is answered with `outputTail` instead (issue #346): the bounded tail of the run's stdout and stderr, in `check_project`'s bounds and shape (40 lines and 4000 characters, elision counted).  That is a process named as `--agda-bin` that failed without printing a diagnostic: a launcher that refuses (`scripts/agda-for-flake.sh` exits 69 with one line naming the cause), an Agda internal error (exit 154 and an `__IMPOSSIBLE__` banner), a missing shared library, or a binary that could not be started (exit -1, the exception text).  A success, a failure with at least one diagnostic, and a timeout (whose diagnostic already names the bound) carry no `outputTail`, so their answers keep their size.
 +  Identical diagnostics collapse to one.  A run that ends in warnings prints each of them twice (once where it was raised, once under Agda's `———— All done; warnings encountered ————` banner) and counting both would double every count.
 
 The regression suite under `test/resources/diagnostics/` has one fixture per error class of the field report's [§ 5 corpus](../docs/feedback/flrp-agda-mcp-improvements.md) (`ModuleDoesntExport`, `NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnsolvedConstraints` + `UnsolvedMetaVariables`) each asserting the code, the range, and the payload § 5 asks for, against the pinned Agda.  Where Agda 2.9.0 prints a class differently (a mismatch, now laid out one side per line, and a clash, whose origin now ends a scope explanation), its output is captured beside 2.8.0's and both must parse, since the server serves projects on either (issue #234).
@@ -801,7 +802,27 @@ every proof-state tool adds on request; it is shown in full only here.
 }
 ```
 
-The timeout notice is a diagnostic like any other, and stays first: it explains why the rest of the list is short.  See [Structured diagnostics](#structured-diagnostics-issue-74) for `code`, `range`, `involved`, the ordering, and the cap.
+**Output (a failure no diagnostic explains)**.  The launcher of a
+[flake registration](../docs/agda-mcp/registering-a-project.md), run in a
+directory with no `flake.nix` above it, as measured on 2026-11-22 (the path
+shortened).
+
+```json
+{
+  "success": false,
+  "diagnostics": [],
+  "diagnosticsTotal": 0,
+  "holesCount": 0,
+  "holes": [],
+  "timedOut": false,
+  "elapsedMs": 12,
+  "outputTail": "agda-for-flake: no flake.nix at or above /scratch/e2e-noflake (searched up to /)",
+  "verdict": {"exitCode": 69},
+  "project": {"…": "…"}
+}
+```
+
+The timeout notice is a diagnostic like any other, and stays first: it explains why the rest of the list is short.  A failure that left no diagnostic at all is the one answer that carries `outputTail` (see [Structured diagnostics](#structured-diagnostics-issue-74)).  See [Structured diagnostics](#structured-diagnostics-issue-74) for `code`, `range`, `involved`, the ordering, and the cap.
 
 #### `get_diagnostics`
 
@@ -843,7 +864,7 @@ Retrieve the current diagnostic state without reloading: error count, warning co
 }
  ```
 
-`success` and `verdict` are the same fields `check_file` returns, with the same derivation from Agda's exit code: the two tools differ in what they summarize, never in what green means.  The `errors` / `warnings` counts come from parsing Agda's prose and can drift with its message format, which is exactly why `success` is not read from them.
+`success` and `verdict` are the same fields `check_file` returns, with the same derivation from Agda's exit code: the two tools differ in what they summarize, never in what green means.  So is `outputTail`, under the same rule: present only for a failure, not a timeout, that left no diagnostic.  The `errors` / `warnings` counts come from parsing Agda's prose and can drift with its message format, which is exactly why `success` is not read from them.
 
 Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.  The `line`/`col` pair is the one to pass back: a fill moves it only when the edit moves the hole's text, while `index` is renumbered by any fill at all (see [Stable hole handles](#stable-hole-handles-issue-79)).  `errors` and `warnings` count every diagnostic found, not just the ones `maxDiagnostics` kept.
 

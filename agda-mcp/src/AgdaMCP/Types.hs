@@ -1407,6 +1407,14 @@ instance ToJSON Diagnostic where
 --
 -- 'fcrHoles' lists the holes 'fcrHolesCount' counts, so the first call of a
 -- session already hands back the positions to address them by (issue #79).
+--
+-- 'fcrOutputTail' is the one field that exists for the runs the diagnostics
+-- cannot describe (issue #346): a launcher that refuses, an Agda internal
+-- error, a binary that cannot start.  Those fail with nothing the parser
+-- recognizes, so without the tail the answer was @success: false@, an exit
+-- code, and an empty list.  It is withheld from every run that has a better
+-- account of itself (a success, a failure with diagnostics, a timeout), so
+-- those answers stay at the size that issue #184 cut them to.
 data FileCheckResult = FileCheckResult
   { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0, in time.
   , fcrDiagnostics :: [Diagnostic]  -- ^ Up to @maxDiagnostics@ of them, most likely root cause first.
@@ -1423,6 +1431,11 @@ data FileCheckResult = FileCheckResult
   , fcrCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
                                     --   @.agdai@)?  Nothing — and the field omitted —
                                     --   when the run died before producing evidence.
+  , fcrOutputTail  :: Maybe Text    -- ^ The bounded tail of the run's output (#346),
+                                    --   only for a failure that is not a timeout and
+                                    --   left no diagnostic to parse: the one answer
+                                    --   that would otherwise say nothing of why.
+                                    --   Nothing (the key omitted) on every other run.
   , fcrVerdict     :: Verdict        -- ^ What was run and what @success@ means (#72).
   , fcrCommand     :: CommandEcho    -- ^ The resolved agda command line (#72).
   , fcrProject     :: ProjectContext -- ^ The tree that was checked (#76).
@@ -1441,6 +1454,7 @@ instance ToJSON FileCheckResult where
     , "command"           .= fcrCommand r
     , "project"           .= fcrProject r
     ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (fcrCheckedFromSource r)
+      <> maybe [] (\t -> ["outputTail" .= t]) (fcrOutputTail r)
 
 -- | Result of @get_diagnostics@ (cached state from last check).
 --
@@ -1472,6 +1486,7 @@ data DiagnosticsResult = DiagnosticsResult
   , drCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
                                  --   @.agdai@)?  Nothing — and the field omitted —
                                  --   when the run died before producing evidence.
+  , drOutputTail  :: Maybe Text  -- ^ As 'fcrOutputTail', under the same rule (#346).
   , drVerdict     :: Verdict        -- ^ What was run and what @success@ means (#72).
   , drCommand     :: CommandEcho    -- ^ The resolved agda command line (#72).
   , drProject     :: ProjectContext -- ^ The tree that was checked (#76).
@@ -1492,6 +1507,7 @@ instance ToJSON DiagnosticsResult where
     , "command"           .= drCommand r
     , "project"           .= drProject r
     ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (drCheckedFromSource r)
+      <> maybe [] (\t -> ["outputTail" .= t]) (drOutputTail r)
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- § The whole-project gate (issue #78)

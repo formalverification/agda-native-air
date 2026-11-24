@@ -148,6 +148,7 @@ module AgdaMCP.Tools.ProofState
   , batchVerdictMeaning
   , fillVerdictMeaning
   , goalVerdictMeaning
+  , unexplainedFailureTail
   ) where
 
 import Control.Applicative ((<|>))
@@ -179,6 +180,7 @@ import AgdaMCP.Interaction
   )
 import AgdaMCP.Project
   ( fileDirIncludeFlags, projectExtraFlags, resolveProject, withEffectiveFlags )
+import AgdaMCP.Tools.CheckProject (outputTailOf)
 import AgdaMCP.Tools.LiveQueries
   ( interactionFailure, laneCommandEcho, laneEchoFrom, pointForHole )
 import AgdaMCP.Types
@@ -506,8 +508,8 @@ handleCheckFile lanes cfg0 params =
           -- to success:false — accurate but unactionable.  It is prepended after
           -- the root-cause sort rather than through it: it explains why the rest of
           -- the list is short, so it belongs first whatever else was found.
-          allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
-                       <> parseDiagnostics combined
+          parsed   = parseDiagnostics combined
+          allDiags = [ timeoutDiagnostic cfg | arTimedOut result ] <> parsed
           (diags, total) = capDiagnostics (cfMaxDiagnostics params) allDiags
           success = arExitCode result == 0 && not (arTimedOut result)
       -- Fill each hole's goal type from the interaction lane when — and only
@@ -529,6 +531,7 @@ handleCheckFile lanes cfg0 params =
         , fcrTimedOut    = arTimedOut result
         , fcrElapsedMs   = arElapsedMs result
         , fcrCheckedFromSource = checkedFromSourceOf result
+        , fcrOutputTail  = unexplainedFailureTail result parsed combined
         , fcrVerdict     = plainVerdict result batchVerdictMeaning
         , fcrCommand     = arCommand result
         , fcrProject     = pc
@@ -566,8 +569,8 @@ handleGetDiagnostics lanes cfg0 params =
           -- As in check_file: a timeout is itself an error diagnostic, so it lands in
           -- both the list and the error count rather than vanishing into a summary
           -- that reads "0 errors" because Agda never finished reporting any.
-          allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
-                       <> parseDiagnostics combined
+          parsed   = parseDiagnostics combined
+          allDiags = [ timeoutDiagnostic cfg | arTimedOut result ] <> parsed
           (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
           countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
       -- The same warm-lane peek as check_file (issues #108 and #115).
@@ -584,6 +587,9 @@ handleGetDiagnostics lanes cfg0 params =
         , drTimedOut = arTimedOut result
         , drElapsedMs = arElapsedMs result
         , drCheckedFromSource = checkedFromSourceOf result
+          -- As in check_file (issue #346): the rule lives in one function, so
+          -- the two tools cannot disagree on when the tail is sent.
+        , drOutputTail = unexplainedFailureTail result parsed combined
         , drVerdict  = plainVerdict result batchVerdictMeaning
         , drCommand  = arCommand result
         , drProject  = pc
@@ -806,6 +812,43 @@ holeLabel flav src i = case drop i (findHoles flav src) of
 -- position, or payload; 'plainDiagnostic' is exactly that shape.
 timeoutDiagnostic :: AgdaConfig -> Diagnostic
 timeoutDiagnostic cfg = plainDiagnostic DiagError (timeoutMessage cfg)
+
+-- | unexplainedFailureTail: the @outputTail@ of @check_file@ and
+-- @get_diagnostics@ (issue #346), sent only when nothing else in the answer
+-- says why the run failed.
+--
+-- The case it exists for is a process named as @--agda-bin@ that fails
+-- without printing anything 'parseDiagnostics' recognizes: a launcher that
+-- refuses (@scripts/agda-for-flake.sh@ exits 69 with one line naming the
+-- cause), an Agda internal error (exit 154 and an @__IMPOSSIBLE__@ banner), a
+-- missing shared library, a binary that could not be started at all ('runAgda'
+-- puts the exception on stderr and reports exit -1).  Each of those used to
+-- answer @success: false@, an exit code, and an empty list, and the model had
+-- no word of why.  The tail is 'outputTailOf' of the same combined output the
+-- parser read, so its bounds and shape are @check_project@'s.
+--
+-- Every other run answers as before, which keeps the answers of issue #184 at
+-- their size:
+--
+--   * a success (exit 0, in time) has nothing to explain;
+--   * a failure with at least one parsed diagnostic has its explanation in the
+--     list.  The test is on what the parser found, before the @maxDiagnostics@
+--     cap; the cap keeps at least one (zero means no limit), so the list a
+--     caller sees is empty exactly when this one is;
+--   * a timeout is decided here, as the issue asks: no tail.  The timeout
+--     diagnostic already names the bound and what to do about it, and what a
+--     killed run printed is where it got (Agda's @Checking@ lines, or the
+--     launcher's @nix build@ progress on a cold key), not why it failed; it
+--     would add up to 4,000 characters to an answer that is not silent.  The
+--     launcher's nix output is the one place a tail could tell more (a build,
+--     not a typecheck, ran out of time), and the diagnostic's advice, raise
+--     @--timeout@, is right for both.
+unexplainedFailureTail :: AgdaResult -> [Diagnostic] -> Text -> Maybe Text
+unexplainedFailureTail result parsed combined
+  | arExitCode result == 0 = Nothing
+  | arTimedOut result      = Nothing
+  | not (null parsed)      = Nothing
+  | otherwise              = outputTailOf combined
 
 
 -- | ensureDebugImport: ensure @open import AgdaDojang.Debug@ is in scope at the top

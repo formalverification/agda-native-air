@@ -34,7 +34,8 @@
 --      name Agda itself resolves (#100), and 2f: re-anchoring by position
 --      across a fill (#79).
 --      1m: the stamp of the Agda a spawn would start (#347), on stand-in
---      files and an identity command, no Agda.
+--      files and an identity command, no Agda; 1n: the outputTail of a
+--      failure no diagnostic explains (#346), on stand-in --agda-bins.
 --   3. The interaction lane (needs agda on PATH): the live-query tools, and
 --      3b: search_in_scope (#17) against the fixture corpus and the narrow
 --      imports of ScopeSearch.agda, every rendering typed by the lane; 3d: a
@@ -3317,6 +3318,18 @@ timeoutTests = do
                       Fail m -> pure (Fail m)
                       Pass   -> assert ("errors = " <> show (drErrors dr))
                                   (drErrors dr >= 1)
+
+          -- Issue #346's edge: a timeout that parsed no diagnostic of Agda's
+          -- still sends no outputTail.  The stand-in printed its Checking line
+          -- before the kill, so the tail would not be empty: its absence is
+          -- the rule, not an empty output.
+        , runTest "check_file / get_diagnostics: a timeout carries no outputTail (#346)" $
+            withRight chk $ \c -> withRight diag $ \d -> allOf
+              [ assertEqual "check_file outputTail" Nothing (fcrOutputTail c)
+              , assertEqual "get_diagnostics outputTail" Nothing (drOutputTail d)
+              , assert "the killed run did print something"
+                  (fcrCheckedFromSource c == Just True)
+              ]
         ]
 
       -- Second orphan sweep.  The slow runs after the first sweep (fill_hole,
@@ -6945,6 +6958,25 @@ diagnosticIntegrationTests cfg = do
                 , assertEqual "diagnosticsTotal" 2 (drDiagnosticsTotal dr)
                 , assert "success should be False" (not (drSuccess dr))
                 ]
+
+          -- Issue #346's control against a real Agda: a type error is a
+          -- failure the diagnostics explain, so neither tool adds outputTail,
+          -- and the answer keeps the size it had before the field existed.
+        , runTest "check_file / get_diagnostics: a real type error sends no outputTail (#346)" $ do
+            let path = diagnosticFixtureDir </> "UnequalTerms.agda"
+            chk <- handleCheckFile injLanes cfg
+              CheckFileParams { cfFilePath = path, cfMaxDiagnostics = Nothing }
+            dia <- handleGetDiagnostics injLanes cfg
+              GetDiagnosticsParams { gdFilePath = path, gdMaxDiagnostics = Nothing }
+            withRight chk $ \c -> withRight dia $ \d -> allOf
+              [ assert "success should be False" (not (fcrSuccess c))
+              , assert ("codes were " <> show (codesOf (fcrDiagnostics c)))
+                  (any (maybe False (`elem` typeMismatchCodes) . diagCode) (fcrDiagnostics c))
+              , assertEqual "check_file outputTail" Nothing (fcrOutputTail c)
+              , assertEqual "get_diagnostics outputTail" Nothing (drOutputTail d)
+              , assertEqual "not on the wire" Nothing
+                  (valueAt ["outputTail"] (answerAt Lean (Aeson.toJSON c)))
+              ]
         ]
 
 
@@ -9142,6 +9174,136 @@ scratchDir label = do
   pure dir
 
 -- ---------------------------------------------------------------------------
+-- Tier 1n: the output tail of a failure nothing explains (issue #346), no Agda
+--
+-- check_file and get_diagnostics build their answer from what
+-- AgdaMCP.Diagnostics parses, so a --agda-bin that fails without printing a
+-- diagnostic header used to answer success:false, an exit code, and an empty
+-- list.  Each stand-in below is one such failure, as measured on 2026-11-06:
+-- the launcher of scripts/agda-for-flake.sh refusing (one line on stderr,
+-- exit 69), and Agda's internal-error banner (exit 154).  Both tools must
+-- carry the line in outputTail.  The controls are the runs that must answer
+-- exactly as before: a success, and a failure the parser does explain.  A
+-- timeout is the third control, asserted in tier 1c where the suite already
+-- pays for one; a real type error is the fourth, in tier 2e.
+-- ---------------------------------------------------------------------------
+
+-- | The launcher's refusal, as scripts/agda-for-flake.sh words it.
+launcherRefusal :: Text
+launcherRefusal =
+  "agda-for-flake: no flake.nix at or above /scratch/no-flake; no Agda was run"
+
+-- | Agda's internal-error banner, its two load-bearing lines.
+internalErrorBanner :: [Text]
+internalErrorBanner =
+  [ "An internal error has occurred. Please report this as a bug."
+  , "Location of the error: __IMPOSSIBLE__, called at src/full/Agda/TypeChecking/Monad/Base.hs:42:1 in Agda-2.9.0:Agda.TypeChecking.Monad.Base"
+  ]
+
+silentFailureTests :: IO [Bool]
+silentFailureTests = do
+  hPutStrLn stderr "\n── The output tail of an unexplained failure (tier 1n: no Agda, #346) ──"
+  injLanes <- injectionOnlyLanes
+  launcher <- fakeLaneBinary "tail-launcher" $ unlines
+    [ "#!/bin/sh", "echo '" <> T.unpack launcherRefusal <> "' >&2", "exit 69" ]
+  internal <- fakeLaneBinary "tail-internal" $ unlines $
+    [ "#!/bin/sh" ]
+    <> [ "echo '" <> T.unpack l <> "' >&2" | l <- internalErrorBanner ]
+    <> [ "exit 154" ]
+  -- The controls.  A success that prints (a Checking line), so its missing
+  -- tail is the rule and not an empty output; and a failure whose stderr is
+  -- one Agda diagnostic the parser reads.
+  quiet <- fakeLaneBinary "tail-success" $ unlines
+    [ "#!/bin/sh", "echo 'Checking TimeoutFixture (fixture.agda).'", "exit 0" ]
+  explained <- fakeLaneBinary "tail-explained" $ unlines
+    [ "#!/bin/sh"
+    , "echo 'Checking TimeoutFixture (fixture.agda).'"
+    , "echo '/scratch/TimeoutFixture.agda:3.5-10: error: [NotInScope]' >&2"
+    , "echo 'Not in scope:' >&2"
+    , "echo '  zeroo at /scratch/TimeoutFixture.agda:3.5-10' >&2"
+    , "exit 42"
+    ]
+  let cfgFor bin = defaultConfig
+        { agdaBin     = bin
+        , agdaFlags   = ["-i", "test/resources", "-l", "agda-dojang"]
+        , agdaTimeout = Just 60
+        }
+      check bin = handleCheckFile injLanes (cfgFor bin)
+                    (CheckFileParams timeoutFixturePath Nothing)
+      diags bin = handleGetDiagnostics injLanes (cfgFor bin)
+                    (GetDiagnosticsParams timeoutFixturePath Nothing)
+      -- What a client reads: the lean answer as encoded.
+      leanTail :: Aeson.ToJSON a => a -> Maybe Aeson.Value
+      leanTail = valueAt ["outputTail"] . answerAt Lean . Aeson.toJSON
+  cLaunch <- check launcher
+  dLaunch <- diags launcher
+  cInt    <- check internal
+  dInt    <- diags internal
+  cQuiet  <- check quiet
+  dQuiet  <- diags quiet
+  cExpl   <- check explained
+  dExpl   <- diags explained
+  -- A binary that cannot be started at all: runAgda reports exit -1 with the
+  -- exception on stderr, which is a failure no diagnostic explains either.
+  cGone   <- check "/nonexistent/agda-mcp-346-missing"
+  sequence
+    [ runTest "check_file: a refusing launcher's line arrives in outputTail" $
+        withRight cLaunch $ \r -> allOf
+          [ assertEqual "outputTail" (Just launcherRefusal) (fcrOutputTail r)
+          , assertEqual "exitCode" 69 (vExitCode (fcrVerdict r))
+          , assert "success should be False" (not (fcrSuccess r))
+          , assertEqual "diagnostics" 0 (length (fcrDiagnostics r))
+          ]
+
+    , runTest "get_diagnostics: a refusing launcher's line arrives in outputTail" $
+        withRight dLaunch $ \r -> allOf
+          [ assertEqual "outputTail" (Just launcherRefusal) (drOutputTail r)
+          , assertEqual "exitCode" 69 (vExitCode (drVerdict r))
+          , assertEqual "errors" 0 (drErrors r)
+          ]
+
+    , runTest "check_file / get_diagnostics: the lean answer carries outputTail on the wire" $
+        withRight cLaunch $ \c -> withRight dLaunch $ \d -> allOf
+          [ assertEqual "check_file" (Just (Aeson.String launcherRefusal)) (leanTail c)
+          , assertEqual "get_diagnostics" (Just (Aeson.String launcherRefusal)) (leanTail d)
+          ]
+
+    , runTest "check_file / get_diagnostics: Agda's internal-error banner arrives in outputTail" $
+        withRight cInt $ \c -> withRight dInt $ \d -> allOf
+          [ assertEqual "check_file outputTail"
+              (Just (T.intercalate "\n" internalErrorBanner)) (fcrOutputTail c)
+          , assertEqual "get_diagnostics outputTail"
+              (Just (T.intercalate "\n" internalErrorBanner)) (drOutputTail d)
+          , assertEqual "exitCode" 154 (vExitCode (fcrVerdict c))
+          , assertEqual "no diagnostic was parsed" 0 (fcrDiagnosticsTotal c)
+          ]
+
+    , runTest "check_file: an agda that cannot be started says why in outputTail" $
+        withRight cGone $ \r -> allOf
+          [ assertEqual "exitCode" (-1) (vExitCode (fcrVerdict r))
+          , assert ("outputTail was " <> show (fcrOutputTail r))
+              (maybe False ("agda-mcp-346-missing" `T.isInfixOf`) (fcrOutputTail r))
+          ]
+
+    , runTest "check_file / get_diagnostics: a success sends no outputTail" $
+        withRight cQuiet $ \c -> withRight dQuiet $ \d -> allOf
+          [ assert "success" (fcrSuccess c && drSuccess d)
+          , assertEqual "check_file outputTail" Nothing (fcrOutputTail c)
+          , assertEqual "get_diagnostics outputTail" Nothing (drOutputTail d)
+          , assertEqual "not on the wire" Nothing (leanTail c)
+          ]
+
+    , runTest "check_file / get_diagnostics: a failure with a diagnostic sends no outputTail" $
+        withRight cExpl $ \c -> withRight dExpl $ \d -> allOf
+          [ assertEqual "the parser explained it" [Just "NotInScope"] (codesOf (fcrDiagnostics c))
+          , assertEqual "check_file outputTail" Nothing (fcrOutputTail c)
+          , assertEqual "get_diagnostics outputTail" Nothing (drOutputTail d)
+          , assertEqual "not on the wire" Nothing (leanTail d)
+          ]
+    ]
+
+
+-- ---------------------------------------------------------------------------
 -- Tier 1m: the stamp of the Agda a spawn would start (issue #347), no Agda
 --
 -- What the lane compares before reusing a child: the real path of
@@ -10215,6 +10377,8 @@ main = do
   autoResults <- autoTests
   -- Tier 1m: the stamp of the Agda a spawn would start (#347), no Agda.
   stampResults <- agdaStampTests
+  -- Tier 1n: the output tail of a failure nothing explains (#346), no Agda.
+  silentResults <- silentFailureTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -10290,7 +10454,7 @@ main = do
         pureResults <> diagResults <> holeResults <> corpusResults <> writtenResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
           <> pathResults <> wireResults <> scopeResults <> leanResults <> surfaceResults
-          <> declResults <> autoResults <> stampResults
+          <> declResults <> autoResults <> stampResults <> silentResults
           <> integrationResults <> cwdResults <> leanWireResults <> exposeWireResults
           <> autoWireResults
           <> laneResults <> definitionResults <> scopeLaneResults <> autoLaneResults

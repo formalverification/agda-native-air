@@ -317,7 +317,8 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
       , toolDef "check_file"
           ("Typecheck one Agda file with batch agda and return its \
            \diagnostics. " <> batchNote <> " " <> diagnosticModel
-           <> " " <> holeListing True <> " " <> batchTimeout)
+           <> " " <> holeListing True <> " " <> batchTimeout
+           <> " " <> silentFailure)
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           , prop "verbose"        "boolean" verboseDoc
@@ -336,11 +337,13 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
                   \check_file lists them. success and verdict are check_file's \
                   \fields with the same meaning: the two tools differ in what \
                   \they summarize, never in what green means. " <> countsNote
-                  <> " A timeout answers as check_file's does."
+                  <> " A timeout, or a failure with no diagnostic (outputTail), \
+                     \answers as check_file's does."
              else "Typecheck one Agda file with batch agda and summarize it: \
                   \errors and warnings counts and the diagnostics behind them. "
                   <> batchNote <> " " <> diagnosticModel <> " "
-                  <> holeListing False <> " " <> countsNote <> " " <> batchTimeout)
+                  <> holeListing False <> " " <> countsNote <> " " <> batchTimeout
+                  <> " " <> silentFailure)
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           , prop "verbose"        "boolean" verboseDoc
@@ -584,6 +587,12 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
          \call), '?' otherwise."
     batchTimeout = "A timeout answers success:false, timedOut:true, and a \
                    \timeout diagnostic."
+    -- Issue #346: the one answer that would otherwise be silent.  The clause
+    -- names the field and its condition; the bounds are check_project's and
+    -- are stated in the README rather than here, under the 2,048 cap.
+    silentFailure = "A failure that leaves no diagnostic (agda, or the \
+                    \launcher standing in for it, died without reporting \
+                    \one) adds outputTail, the last lines of its output."
     countsNote = "The counts cover every diagnostic found, not only the \
                  \capped list, and are parsed from Agda's prose, so they can \
                  \drift with its format; that is why success is never read \
