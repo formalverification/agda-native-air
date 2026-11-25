@@ -276,26 +276,27 @@
     # agdaPackages set as mkAgdaEnv so the library is checked by the same
     # Agda + stdlib the shells use.
     #
-    # The commit's agda-algebras.agda-lib says `depend: standard-library-2.3`,
-    # an exact name that standard-library 2.4.1 (`standard-library-2.4`) does
-    # not satisfy, so postPatch rewrites that one line and nothing else; the
-    # sources, and so the benchmark's and the corpus's provenance, stay the
-    # commit's (issue #374, where keeping the commit was chosen over a re-cut
-    # at a newer one).  Measured 2026-11-24 under the released Agda 2.9.0 and
-    # standard-library 2.4.1: all 407 modules check, with the nightly's 954
-    # warning positions and 104 more, every one a standard-library 2.4
-    # deprecation of five names (`_×-dec_`, `_→-dec_`, `_⊎-dec_`, `¬∀⟶∃¬`,
-    # `¬∀⟶∃¬-smallest`) that agda-algebras renamed upstream after this commit
-    # (ualib/agda-algebras PR #642).  The grep fails the build if the line
-    # was not there to rewrite.
+    # The commit stays the benchmark's and the corpus's (issue #374 chose it
+    # over a re-cut at a newer one), moved to standard-library 2.4.1 by one
+    # patch, nix/agda-algebras-4662373d-stdlib-2.4.patch, as follows:
+    #   +  its agda-algebras.agda-lib says `depend: standard-library-2.3`, an
+    #      exact name that 2.4.1 (`standard-library-2.4`) does not satisfy;
+    #   +  five names 2.4 deprecates (`_×-dec_`, `_→-dec_`, `_⊎-dec_`,
+    #      `¬∀⟶∃¬`, `¬∀⟶∃¬-smallest`) become their documented replacements,
+    #      the renames agda-algebras made upstream (ualib/agda-algebras PR
+    #      #642).  Without them the build raised 104 new warnings in 16
+    #      modules the benchmark fixtures import, and Agda replays an
+    #      imported module's warnings, so 58 of the 162 fixture checks, and
+    #      agda-mcp's check_file on them, printed about 30 of them each.
+    # Measured 2026-11-24 under the released Agda 2.9.0: all 407 modules
+    # check, and the warning positions are exactly the nightly's 954.  The
+    # patch's header says how it was made; a patch that no longer applies
+    # fails the build.
     mkAgdaAlgebrasPkg = ap: ap.mkDerivation {
       pname = "agda-algebras";
       version = "unstable-2026-09-07";
       src = agda-algebras-src;
-      postPatch = ''
-        sed -i 's/^depend: standard-library-2\.3$/depend: standard-library-2.4/' agda-algebras.agda-lib
-        grep -qx 'depend: standard-library-2.4' agda-algebras.agda-lib
-      '';
+      patches = [ ./nix/agda-algebras-4662373d-stdlib-2.4.patch ];
       buildInputs = [ ap.standard-library ];
       meta = {
         description = "The Agda Universal Algebra Library, pinned at the benchmark-suite commit";
