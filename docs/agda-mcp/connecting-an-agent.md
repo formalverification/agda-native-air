@@ -236,13 +236,16 @@ What the server does to your files: `check_file` writes Agda's interface
 files, as `agda` does; `get_goal` and `fill_hole` patch the file on disk for
 the length of a call and restore it byte for byte, on the timeout path too,
 so an editor with the file open may notice the file change and change back.
-A save you make during such a call is kept: the server writes only over
-bytes it read or wrote, and the call then fails, naming the file (issue
-[#136]).  `fill_hole` leaves a candidate in the file only when a call passes
-`apply: true` and Agda accepts it.  Add `--no-apply` to the arguments and
-the server refuses that, which is the setting for an agent working beside an
-editor that has your files open; such a client takes the edit as a patch
-and makes it itself ([the server's README][keeping-a-candidate]).
+A save you make while Agda is checking is kept: before each write the
+server compares the file with the bytes it read or wrote, and when they
+differ it writes nothing and the call fails, naming the file (issue [#136]).
+Only a save that lands in the fraction of a millisecond between a comparison
+and its write is lost; [the server's README][keeping-a-candidate] has the
+measurement.  `fill_hole` leaves a candidate in the file only when a call
+passes `apply: true` and Agda accepts it.  Add `--no-apply` to the arguments
+and the server refuses that, which is the setting for an agent working
+beside an editor that has your files open; such a client takes the edit as a
+patch and makes it itself (the same section of the README).
 A project that gets its Agda through Nix (agda-algebras,
 formal-ledger-specifications) has its template in [Registering a
 project][registering], and a copy in [`agda-mcp/examples/`][examples-readme].
