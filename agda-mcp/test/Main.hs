@@ -170,7 +170,7 @@ import AgdaMCP.Tools.CheckProject
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors
-  , InPlaceOps (..) , runInPlace , runInPlaceWith )
+  , InPlaceEnd (..) , InPlaceOps (..) , runInPlace , runInPlaceWith )
 import AgdaMCP.Tools.LiveQueries
   ( handleDefinitionOf, handleExportsOf, handleNormalize, handleResolveName
   , handleTypeOf, pageExports, quoteSites )
@@ -11054,6 +11054,44 @@ patchApplyTests = do
           [ assertEqual "the file" inPlaceOriginal after
           , assertEqual "the cancellation reached the call, after the restore" (Left Cancelled)
               (either Left (const (Right ())) r)
+          ]
+
+    , -- The same, for an apply whose candidate Agda accepted (Copilot's
+      -- second review of PR 371).  The settlement keeps it, so nothing in the
+      -- settlement writes; the cancellation, held through it, must still find
+      -- a handler that restores, and not be taken after the call has decided.
+      runTest "guard: a call cancelled during the settlement of an apply keeps nothing" $ do
+        m     <- memoryFile inPlaceOriginal
+        seen  <- newIORef (0 :: Int)
+        let ops = (mfOps m)
+              { ipoRead = do
+                  modifyIORef' seen (+ 1)
+                  n <- readIORef seen
+                  if n == 2 then cancelMeAndBlock else pure ()
+                  ipoRead (mfOps m)
+              }
+        r     <- try (runInPlaceWith ops "/mem/M.agda" inPlaceOriginal inPlacePatched (const True))
+        after <- readIORef (mfBytes m)
+        steps <- map fst . reverse <$> readIORef (mfLog m)
+        allOf
+          [ assertEqual "the file" inPlaceOriginal after
+          , assertEqual "the cancellation reached the call" (Left Cancelled)
+              (either Left (const (Right ())) r)
+          , assertEqual "the keep, then the restore its handler made"
+              ["read", "write", "check", "read", "read", "write"] steps
+          ]
+
+    , -- Its control: with nothing cancelled, the last check takes nothing,
+      -- and the candidate stays.
+      runTest "guard: an apply nobody cancels keeps its candidate, and writes nothing after the check" $ do
+        m     <- memoryFile inPlaceOriginal
+        r     <- runInPlaceWith (mfOps m) "/mem/M.agda" inPlaceOriginal inPlacePatched (const True)
+        after <- readIORef (mfBytes m)
+        steps <- map fst . reverse <$> readIORef (mfLog m)
+        allOf
+          [ assertEqual "kept" (Right Kept) (snd <$> r)
+          , assertEqual "the file" inPlacePatched after
+          , assertEqual "the steps" ["read", "write", "check", "read"] steps
           ]
 
     , runTest "guard: a call cancelled while the patch is being written puts the original back, and runs no agda" $ do

@@ -182,7 +182,7 @@ module AgdaMCP.Tools.ProofState
   ) where
 
 import Control.Applicative ((<|>))
-import Control.Exception (mask, onException, uninterruptibleMask_)
+import Control.Exception (allowInterrupt, mask, onException, uninterruptibleMask_)
 import qualified Data.ByteString as BS
 import GHC.Clock (getMonotonicTimeNSec)
 import Data.List (find, findIndex)
@@ -827,9 +827,23 @@ data InPlaceEnd
 -- ends in the settlement above: after a clean run, a timeout (which
 -- 'AgdaMCP.Agda.runAgda' reports as a /value/, 'arTimedOut', after it has
 -- killed and reaped the subprocess; issue #77), and an exception thrown at
--- the waiting thread alike, so a call that is cancelled never keeps a patch
--- (the suite cancels one while Agda runs, one while the patch is being
--- written, and one during the settlement).  The whole call runs under
+-- the waiting thread alike.  A call that is cancelled keeps no patch, apply
+-- or not: an exception that arrives while Agda runs settles the file as a
+-- restore; one that arrives during a file step is held until the step ends
+-- and then taken where a handler restores; and one held through a settlement
+-- that kept a candidate is taken at a last check, before the call returns,
+-- whose handler restores the file too.  Without that check it was taken as
+-- the call left 'mask', after the keep, so the call failed with the
+-- candidate in the file and no answer saying so (Copilot's second review of
+-- PR 371).  The suite cancels a call while Agda runs, while the patch is
+-- being written, and during the settlement of a restore and of an apply.
+-- What remains is the instant after that check: an exception that arrives
+-- there, or after the call has returned and before its answer is written,
+-- leaves an accepted candidate in the file and the call unanswered.  Nothing
+-- inside the call can close it; a client that gets no answer reads the file
+-- again.  In the server such an exception is SIGINT, which the runtime
+-- raises in the thread that runs every call, and the server then exits.
+-- The whole call runs under
 -- 'mask', and the two steps that touch the file (the comparison with the
 -- patch write, and the settlement) under 'uninterruptibleMask_', because
 -- 'mask' alone does not hold an exception off a file operation that blocks:
@@ -915,10 +929,17 @@ runInPlaceWith ops absPath originalBytes patchedBytes keep = mask $ \unmask -> d
     Right ()     -> do
       result  <- unmask (ipoCheck ops) `onException` settle False
       settled <- settle (keep result)
+      -- A kept candidate is the call's to answer for, so an exception held
+      -- since the check is taken here, where its handler can still restore,
+      -- rather than as the call leaves 'mask', after the keep.
+      case settled of
+        Right Kept -> allowInterrupt `onException` settle False
+        _          -> pure ()
       pure ((,) result <$> settled)
   where
-    -- An exception that arrives during the settlement is taken when the call
-    -- leaves 'mask', after the file is as it should be.
+    -- An exception that arrives during the settlement is held until it ends,
+    -- and is then taken after a restore (when the call leaves 'mask') or
+    -- after a keep (at the check above, which restores).
     settle :: Bool -> IO (Either FileChanged InPlaceEnd)
     settle keepIt = uninterruptibleMask_ $ do
       now <- ipoRead ops
