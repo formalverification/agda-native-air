@@ -1102,6 +1102,52 @@ agda-mcp is the reason to do it soon.  Sessions in agda-algebras run the server 
 [aa598]: https://github.com/ualib/agda-algebras/pull/598
 [stdlib]: https://github.com/formalverification/agda-stdlib
 
+---
+
+### Issue M0-20: Move to the released Agda 2.9.0 and standard-library 2.4.1 (#374)
+
+**Labels:** `agda-mcp`, `agda-strux`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
+
+## Description
+
+[#234] moved this repository to the pre-release Agda 2.9.0 that ualib/agda-algebras pinned in October (agda/agda at `da66a8c`, the `nightly` of 2026-10-05) and to standard-library 2.3 patched for it (formalverification/agda-stdlib, tag `v2.3-agda-2.9.0`).  Both are now released, and on 2026-11-24 William decided that every Agda project moves to the releases, with standard-library 2.4.1 rather than a wait for 3.0.  agda-algebras moves first, in [ualib/agda-algebras#597]; this issue follows it.
+
+**The releases**, checked 2026-11-24, are as follows:
+
++  **Agda 2.9.0**, released 2026-11-13 ([v2.9.0][agda-release]): tag commit `da046d6903b7f587f5add669650e52f378f57834`, 67 commits after the nightly pinned here.
++  **Standard-library 2.4.1**, released 2026-11-17 ([v2.4.1][stdlib-release]), "compatibility release with Agda 2.9.0": commit `ac7c79b24ecf16cf82decc872d2690c2ee9d8498`, source hash `sha256-7TFjdpqG6tv6qTtWdaGhVXXR7RJYL1R4QlKkYaWdVvI=`, library name `standard-library-2.4`.
++  **nixpkgs** (nixos-unstable of 2026-11-21) packages standard-library 2.4.1 but still Agda 2.8.0, so the `agda` input stays, moved to the release.
+
+**What it touches here**, as follows:
+
++  **The pins**: the `agda` input, the standard library's override in the Agda package set built on `nixpkgs-agda`, and `packages.agda`, as agda-algebras' flake will have them after [ualib/agda-algebras#597].
++  **The Haskell side**: the `backend` shell compiles against Agda as a Haskell library (`agda.packages.${system}.base`), so the agda-strux exporter meets every API change between the nightly and the release.
++  **agda-mcp**: it drives each project's own Agda through `--agda-bin`, so during the move it serves projects on the nightly and on the release at once.  Wording that changed between the two must keep both shapes working, with captured output as fixtures, as [#234] did for 2.8.0 and the nightly.
++  **agda-dojang** and the benchmark libraries depend on `standard-library` by bare name, so they resolve against 2.4.1 without a change to `depend:`, but their deprecations need porting.
++  **`agda-algebras-src`** is pinned at `4662373d`, the commit the benchmark fixtures and the corpus were cut from (issue [#127]; `data/benchmarks/README.md` and `docs/corpora/agda-algebras-v0.1.md` must agree with the flake).  That commit's `agda-algebras.agda-lib` says `depend: standard-library-2.3`, which 2.4.1 does not satisfy.  The options are as follows, and the choice wants evidence and William's word: move the pin to [ualib/agda-algebras#597]'s merge commit and re-cut what was cut from it; keep `4662373d` and rewrite its `depend:` in the derivation, if it checks under 2.4.1; or keep the benchmarks on a frozen toolchain of their own beside the new one.
+
+## Tasks
+
++  [ ] Wait for [ualib/agda-algebras#597] to merge, and take its flake as the model.
++  [ ] Baseline under the current pins: agda-mcp's tests, the give-parity lane, agda-dojang's tests, `make test`, with times.
++  [ ] The pins, the banners and the version guards; lock with Nix 2.28 or later.
++  [ ] agda-mcp and agda-strux under the release: capture the real output for each message kind `Diagnostics` parses, add fixtures, keep the nightly's and 2.8.0's shapes.
++  [ ] The deprecations in agda-dojang and in the libraries this repository checks.
++  [ ] The `agda-algebras-src` decision, with its evidence, and whatever it moves.
++  [ ] CI passes; the first run builds the release's Agda cold, so record its time.
+
+## Acceptance criteria
+
++  [ ] `nix build .#agda .#agda-algebras` and every Agda-capable shell use the released Agda 2.9.0 and standard-library 2.4.1.
++  [ ] The baseline's tests pass on the new pins, and agda-mcp's tests pass against both the nightly's and the release's output.
++  [ ] No file names the nightly or the patched standard library as the current target (dated records excepted).
+
+[#127]: https://github.com/formalverification/agda-native-air/issues/127
+[#234]: https://github.com/formalverification/agda-native-air/issues/234
+[ualib/agda-algebras#597]: https://github.com/ualib/agda-algebras/issues/597
+[agda-release]: https://github.com/agda/agda/releases/tag/v2.9.0
+[stdlib-release]: https://github.com/agda/agda-stdlib/releases/tag/v2.4.1
+
 <!-- END GENERATED: milestone-0 -->
 
 ---
