@@ -110,10 +110,11 @@
 --     a declaration-shaped line sitting inside a @{! … !}@ hole, which Agda
 --     lexes as one token and never parses.
 --     'ensureDebugImport' and 'moduleNameOf' therefore scan
---     'AgdaMCP.Holes.codeOnly' — the source with prose, comments, and pragmas
---     blanked, every character position preserved — so the header they find is
---     the header Agda finds, and a line index found there still splices into the
---     original text.  Scanning the raw source instead is what made get_goal
+--     'AgdaMCP.Holes.codeOnly' (the source with prose, comments, and pragmas
+--     blanked, a leading byte-order mark left out, and every line and column
+--     preserved), so the header they find is the header Agda finds, on line 1
+--     of a marked file too, and a line index found there still splices into
+--     the original text.  Scanning the raw source instead is what made get_goal
 --     report a module name read from a prose line (issue #100): the same fixture
 --     whose prose #73 already stopped fooling the import injection.
 --
@@ -141,7 +142,10 @@
 --     changed is left as the other writer left it, and the call fails
 --     ('AgdaMCP.Types.FailFileChanged') without a verdict, since Agda may have
 --     read either text.  Until #136 the restore was unconditional, and a save
---     made during a check was overwritten by it.
+--     made during a check was overwritten by it.  The guard narrows the time
+--     in which a save can be lost from the whole check to the instant between
+--     a comparison and the write after it (measured: tenths of a millisecond);
+--     it does not close it, and 'runInPlace' says why nothing here can.
 --
 --   Design note: fill_hole can leave a candidate in the file, or answer the
 --   edit (issue #136).
@@ -172,11 +176,13 @@ module AgdaMCP.Tools.ProofState
   , goalVerdictMeaning
   , unexplainedFailureTail
   , InPlaceEnd (..)
+  , InPlaceOps (..)
   , runInPlace
+  , runInPlaceWith
   ) where
 
 import Control.Applicative ((<|>))
-import Control.Exception (mask, onException)
+import Control.Exception (mask, onException, uninterruptibleMask_)
 import qualified Data.ByteString as BS
 import GHC.Clock (getMonotonicTimeNSec)
 import Data.List (find, findIndex)
@@ -802,22 +808,48 @@ data InPlaceEnd
 --
 -- What this narrows and what it does not: a save made at any time during
 -- Agda's run, which is seconds to minutes long, is now seen and kept.  The
--- comparison and the write that follows it are still two system calls, so a
--- save that lands in the instant between them is overwritten as before;
--- closing that needs a lock every writer honors, which an editor does not.
--- Nor are two servers kept apart: one that reads the file during another's
--- check takes the patched text for the original, and restores to it (issue
--- #370).
+-- comparison and the write that follows it are still separate system calls
+-- (a read, then a truncation and a write), so a save that lands between them
+-- is overwritten as before.  Traced on the server over 30 calls (strace,
+-- ext4, 2026-11-24), the end of the read and the truncation were 0.12 to
+-- 0.51 ms apart before the check (median 0.21) and 0.12 to 2.5 ms apart at
+-- the settlement (median 0.23), against 0.10 to 0.14 s between the two
+-- writes on that small module, the tracing included.  Nothing here can close
+-- it against a writer that takes no lock: an
+-- advisory lock binds only the writers that ask for it, and an editor does
+-- not; and replacing the file by a rename compares nothing either, changes
+-- the file's identity, and loses a save written through a descriptor an
+-- editor already holds.  Nor are two servers kept apart: one that reads the
+-- file during another's check takes the patched text for the original, and
+-- restores to it (issue #370).
 --
 -- Every write goes through 'Data.ByteString', and every path that returns
--- ends in the settlement above: it runs under 'mask', after a clean run, a
--- timeout (which 'AgdaMCP.Agda.runAgda' reports as a /value/, 'arTimedOut',
--- after it has killed and reaped the subprocess; issue #77), and an exception
--- thrown at the waiting thread alike, so a call that is cancelled never keeps
--- a patch (the suite cancels one).  A process that is killed runs no handler:
--- SIGTERM or SIGKILL during a check leaves the patched text in the file, as
--- it always has, while SIGINT, which the runtime raises as an exception,
--- restores (measured on the server before and after issue #136; issue #370).
+-- ends in the settlement above: after a clean run, a timeout (which
+-- 'AgdaMCP.Agda.runAgda' reports as a /value/, 'arTimedOut', after it has
+-- killed and reaped the subprocess; issue #77), and an exception thrown at
+-- the waiting thread alike, so a call that is cancelled never keeps a patch
+-- (the suite cancels one while Agda runs, one while the patch is being
+-- written, and one during the settlement).  The whole call runs under
+-- 'mask', and the two steps that touch the file (the comparison with the
+-- patch write, and the settlement) under 'uninterruptibleMask_', because
+-- 'mask' alone does not hold an exception off a file operation that blocks:
+-- GHC's @openFile@ makes an interruptible @open(2)@ under 'mask' and
+-- delivers a pending exception when that call fails or is interrupted, which
+-- it can be on a network or FUSE file system, and an exception taken inside
+-- the settlement would end it before its write (Copilot's review of PR 371).
+-- On ext4 and tmpfs that did not happen once: of 165,173 and 129,194
+-- exceptions thrown at 200,000 masked read-then-write rounds on each, none
+-- arrived inside a round (GHC 9.10.3, threaded, 2026-11-24).  So the suite
+-- holds this through 'runInPlaceWith', with a read and a write that block.
+-- The cost is that a read or a write that never returns cannot be cancelled.
+--
+-- What no handler reaches: a write that fails is not retried, its
+-- 'IOException' goes to the caller, and since a write is a truncation and
+-- then a write the file may be left short; and a process that is killed runs
+-- no handler at all, so SIGTERM or SIGKILL during a check leaves the patched
+-- text in the file, as it always has, while SIGINT, which the runtime raises
+-- as an exception, restores (measured on the server before and after issue
+-- #136; issue #370).
 --
 -- Only the file's /contents/ are restored, not its modification time: the restore write
 -- deliberately leaves a fresh mtime.  That is intentional; a newer mtime forces Agda to
@@ -835,29 +867,66 @@ runInPlace
   -> BS.ByteString          -- ^ The patched bytes to check.
   -> (AgdaResult -> Bool)   -- ^ Keep the patched bytes after this result?
   -> IO (Either FileChanged (AgdaResult, InPlaceEnd))
-runInPlace cfg absPath originalBytes patchedBytes keep = mask $ \unmask -> do
-  found <- readNow
-  if found /= Just originalBytes
-    then pure (Left (changed ChangedBeforeCheck originalBytes found))
-    else do
-      BS.writeFile absPath patchedBytes
-      result  <- unmask (runAgda cfg absPath) `onException` settle False
+runInPlace cfg absPath = runInPlaceWith InPlaceOps
+  { -- The same guarded read the tools start with.
+    ipoRead  = either (const Nothing) Just <$> readRegularFile "filePath" absPath
+  , ipoWrite = BS.writeFile absPath
+  , ipoCheck = runAgda cfg absPath
+  } absPath
+
+-- | What a guarded in-place check does to the world: it reads the file,
+-- replaces its bytes, and runs Agda on it.
+--
+-- 'runInPlace' passes the real three.  The suite passes ones that record the
+-- masking state they run in, and ones that block, because what
+-- 'runInPlaceWith' promises about a cancellation that arrives while the file
+-- is being read or written cannot be shown on a local file, whose reads and
+-- writes do not block.
+data InPlaceOps = InPlaceOps
+  { ipoRead  :: IO (Maybe BS.ByteString)
+    -- ^ The file's bytes now, or Nothing when it is no longer a readable
+    --   regular file.
+  , ipoWrite :: BS.ByteString -> IO ()
+    -- ^ Replace the file's bytes.
+  , ipoCheck :: IO AgdaResult
+    -- ^ Run Agda on the file.
+  }
+
+-- | runInPlaceWith: 'runInPlace' over the given operations; see there for
+-- the guard, and for why the two steps that touch the file cannot be
+-- interrupted.
+runInPlaceWith
+  :: InPlaceOps
+  -> FilePath               -- ^ The file, for the failure's text.
+  -> BS.ByteString          -- ^ The file's bytes, as this call read them.
+  -> BS.ByteString          -- ^ The patched bytes to check.
+  -> (AgdaResult -> Bool)   -- ^ Keep the patched bytes after this result?
+  -> IO (Either FileChanged (AgdaResult, InPlaceEnd))
+runInPlaceWith ops absPath originalBytes patchedBytes keep = mask $ \unmask -> do
+  -- An exception that arrives during this step is taken at 'unmask' below,
+  -- inside the handler's reach, so a patch that was written is settled.
+  written <- uninterruptibleMask_ $ do
+    found <- ipoRead ops
+    if found /= Just originalBytes
+      then pure (Left (changed ChangedBeforeCheck originalBytes found))
+      else Right () <$ ipoWrite ops patchedBytes
+  case written of
+    Left failure -> pure (Left failure)
+    Right ()     -> do
+      result  <- unmask (ipoCheck ops) `onException` settle False
       settled <- settle (keep result)
       pure ((,) result <$> settled)
   where
-    -- The file's bytes now, or Nothing when it is no longer a readable
-    -- regular file: the same guarded read the tools start with.
-    readNow :: IO (Maybe BS.ByteString)
-    readNow = either (const Nothing) Just <$> readRegularFile "filePath" absPath
-
+    -- An exception that arrives during the settlement is taken when the call
+    -- leaves 'mask', after the file is as it should be.
     settle :: Bool -> IO (Either FileChanged InPlaceEnd)
-    settle keepIt = do
-      now <- readNow
+    settle keepIt = uninterruptibleMask_ $ do
+      now <- ipoRead ops
       if now /= Just patchedBytes
         then pure (Left (changed ChangedDuringCheck patchedBytes now))
         else if keepIt
           then pure (Right Kept)
-          else Right Restored <$ BS.writeFile absPath originalBytes
+          else Right Restored <$ ipoWrite ops originalBytes
 
     changed when expected found = FileChanged
       { fchFile     = absPath

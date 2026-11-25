@@ -306,7 +306,7 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
            \exactly as sent (no parentheses are added), typecheck the patched \
            \file in place with batch agda, and restore the file byte for byte"
            <> (if scNoApply cfg
-                 then ", so a candidate you keep you write back yourself"
+                 then "; to keep a candidate, write it back yourself"
                  else "; apply:true instead keeps a candidate whose status is \
                       \\"ok\" (applied says whether it did)")
            <> ". patch:true adds the edit as patch, for a client that edits \

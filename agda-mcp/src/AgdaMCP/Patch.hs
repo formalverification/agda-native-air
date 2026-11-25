@@ -48,6 +48,14 @@ import AgdaMCP.Types (DiagRange (..), TextPatch (..))
 -- @patchedBytes@ the bytes the edit produced; both are passed in rather than
 -- recomputed so that the two digests name exactly what was read and what was
 -- written.
+--
+-- Neither end of the span may fall between the CR and the LF of a CR LF pair.
+-- A hole's never does.  A span that ends its line must end before the CR:
+-- that offset is the line's end as Agda counts it, and as a client whose text
+-- holds no CRs does, while the offset after the CR has a column neither of
+-- them has ('AgdaMCP.Holes'), so a range that ended there could not be
+-- applied by line and column.  The tool that replaces whole clauses (issue
+-- #207) is the first caller this binds.
 textPatch
   :: FilePath       -- ^ The file, as resolved.
   -> BS.ByteString  -- ^ Its bytes as read.

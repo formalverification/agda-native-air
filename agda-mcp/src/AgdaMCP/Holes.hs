@@ -44,14 +44,29 @@
 --
 --   Positions count as Agda counts them (issue #136, where a position became
 --   something a client edits by).  A line and a column are 1-based; a line
---   ends at LF, so the CR of a CR LF pair is the last character of its line
---   and no column reaches it; a column counts Unicode code points, so an
---   astral glyph such as @𝑨@ is one column (two UTF-16 units, four UTF-8
---   bytes) and so is a wide character or a tab; and a leading byte-order mark
---   is no part of the text, because Agda drops it before it reads
+--   ends at LF; a column counts Unicode code points, so an astral glyph such
+--   as @𝑨@ is one column (two UTF-16 units, four UTF-8 bytes) and so is a
+--   wide character or a tab; and a leading byte-order mark is no part of the
+--   text, because Agda drops it before it reads
 --   (@Agda.Utils.IO.UTF8.readTextFile@): 'bomSplit' takes it off before any
 --   scan, and every offset reported is still an offset into the text as
---   given, the mark included.  Measured against batch Agda 2.9.0 on LF,
+--   given, the mark included.  The views a line scan reads ('maskNonCode',
+--   'codeOnly', 'codeWithHoles') are of the text after the mark, so their
+--   line 1 opens with what Agda's line 1 opens with: a @module@ header there
+--   is found, where a view that kept the mark showed its first token as the
+--   mark and the keyword run together.
+--
+--   The CR of a CR LF pair is the last character of its line here, and Agda,
+--   which folds the pair into one line end before it counts, has no such
+--   character.  The two still agree on every position Agda prints: the
+--   column of the CR is the column one past the line's last character of
+--   code, which is where Agda puts the line's end, and where a hole that
+--   closes its line ends.  What this module has and Agda does not is the
+--   column after the CR, the offset of the LF itself; 'offsetOfPosition' and
+--   'positionOfOffset' are inverse there too, but no hole starts or ends
+--   there, and a span that did would have an end that a client holding a
+--   text without CRs could not reach ('AgdaMCP.Patch.textPatch').  Measured
+--   against batch Agda 2.9.0 on LF,
 --   CR LF, marked, and marked CR LF copies of one module, the hole positions
 --   agree; before 'bomSplit' the scan put a hole on line 1 of a marked file
 --   one column right, and read a @--@ comment that opens such a file as code,
@@ -148,12 +163,13 @@ flavourOf path
 -- character position (the same trick as Agda's @illiterate@: non-code
 -- characters become spaces, except newlines and other non-tab whitespace,
 -- which are kept so line/column bookkeeping is unaffected).  For 'PlainAgda'
--- this is the identity.  A leading byte-order mark is kept where it was and is
--- never read as prose or as a marker's first character: Agda has dropped it
--- before its own literate layer runs.
+-- this is the identity on a text with no byte-order mark.  A leading mark is
+-- not in the result, and is never read as prose or as a marker's first
+-- character: Agda has dropped it before its own literate layer runs, so the
+-- view is of the text Agda reads, and a line and a column found on it are
+-- Agda's (an /offset/ into it is one less than into a marked source).
 maskNonCode :: LiterateFlavour -> Text -> Text
-maskNonCode flav src = mark <> maskBody flav body
-  where (mark, body) = bomSplit src
+maskNonCode flav = maskBody flav . snd . bomSplit
 
 -- | bomSplit: a leading byte-order mark (U+FEFF), and the text after it.
 --
@@ -562,10 +578,16 @@ findHoles flav src =
     (mark, body) = bomSplit src
     skip         = T.length mark
 
--- | codeOnly: the source with everything that is not Agda code blanked out —
--- literate prose ('maskNonCode') and comment and pragma text (the lexical
--- scan) — preserving every character position, so a line index or a column
--- found on the result addresses the same character of the original.
+-- | codeOnly: the source with everything that is not Agda code blanked out
+-- (literate prose, by 'maskNonCode', and comment and pragma text, by the
+-- lexical scan), preserving every line and every column as Agda counts them,
+-- so a line index or a column found on the result addresses the same
+-- character of the original.  A leading byte-order mark, which has no column, is not in
+-- the result: a scan that reads a line's first token must not find the mark
+-- joined to it.  With the mark kept, as it was until Copilot's review of PR
+-- 371, a @module@ header or an @import@ on line 1 of a marked file was no
+-- header and no import to 'AgdaMCP.Tools.ProofState.ensureDebugImport',
+-- 'AgdaMCP.Tools.ProofState.moduleNameOf', and 'AgdaMCP.Scope.parseImports'.
 --
 -- This is the view a line scan for a declaration should read, because a scan
 -- of the raw source reads whatever /looks/ like Agda: literate prose opening
@@ -584,13 +606,13 @@ findHoles flav src =
 -- it reads the same scan.  String literals stay, being code Agda does parse.
 codeOnly :: LiterateFlavour -> Text -> Text
 codeOnly flav src =
-  mark <> blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked ]
+  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked ]
   where
-    (mark, body) = bomSplit src
-    masked       = maskBody flav body
+    masked = maskNonCode flav src
 
 -- | codeWithHoles: 'codeOnly' with the holes left in place: literate prose,
--- comments, and pragmas blanked, every character position preserved.
+-- comments, and pragmas blanked, every line and column preserved, and a
+-- leading byte-order mark left out as 'codeOnly' leaves it out.
 --
 -- The view a /layout/ scan reads (issue #185's declaration extent,
 -- 'AgdaMCP.Declaration').  A layout question is not a declaration question: a
@@ -598,10 +620,9 @@ codeOnly flav src =
 -- 'codeOnly' would make it blank and let a declaration's last line vanish.
 codeWithHoles :: LiterateFlavour -> Text -> Text
 codeWithHoles flav src =
-  mark <> blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked, lxKind s /= LexHole ]
+  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked, lxKind s /= LexHole ]
   where
-    (mark, body) = bomSplit src
-    masked       = maskBody flav body
+    masked = maskNonCode flav src
 
 -- | blankSpans: 'bleach' the given character ranges of a text, keeping the
 -- rest.  The ranges must be ascending and non-overlapping, which is how
@@ -725,6 +746,12 @@ offsetOfPosition line col src
 -- byte-order mark itself has no position in the text Agda reads; it answers
 -- @(1, 1)@, where the text begins.  An offset past the end answers the end's
 -- position.
+--
+-- In a CR LF file the offset of a CR answers the column one past its line's
+-- last character of code, which is Agda's end of that line; the offset of
+-- the LF after it answers the column after that, which Agda's line does not
+-- have (see the module header).  Every hole's two ends are positions of the
+-- first kind or plainer, in each encoding the suite writes.
 positionOfOffset :: Text -> Int -> (Int, Int)
 positionOfOffset src off = (1 + T.count "\n" before, 1 + T.length lastLine)
   where

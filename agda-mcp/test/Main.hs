@@ -64,9 +64,12 @@
 
 module Main (main) where
 
-import Control.Concurrent (forkIO, killThread, threadDelay)
+import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay, throwTo)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Exception (bracket_, catch, finally, try, SomeException)
+import Control.Exception
+  ( Exception, MaskingState (..), SomeException, bracket_, catch, finally
+  , getMaskingState, try )
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import System.Timeout (timeout)
 import Data.Time.Clock (addUTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -119,7 +122,7 @@ import AgdaMCP.Agda
   )
 import AgdaMCP.Declaration
 import AgdaMCP.Holes
-  ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly
+  ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly , codeWithHoles
   , HoleSpan (..) , findHoles , findNthHole
   , HoleRef (..) , ResolvedBy (..) , ResolvedHole (..) , offsetOfPosition , resolveHoleRef
   , injectReportExpr , substituteHole , positionOfOffset
@@ -167,7 +170,7 @@ import AgdaMCP.Tools.CheckProject
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors
-  , runInPlace )
+  , InPlaceOps (..) , runInPlace , runInPlaceWith )
 import AgdaMCP.Tools.LiveQueries
   ( handleDefinitionOf, handleExportsOf, handleNormalize, handleResolveName
   , handleTypeOf, pageExports, quoteSites )
@@ -10467,6 +10470,12 @@ movesAway          = ["mv \"$f\" \"$f.moved\""]
 savedBytes :: BS.ByteString
 savedBytes = "module Saved where\n"
 
+-- | A file's bytes and a patched version of them, for the in-place tests
+-- that hold the file in memory.
+inPlaceOriginal, inPlacePatched :: BS.ByteString
+inPlaceOriginal = "module M where\nx = {!!}\n"
+inPlacePatched  = "module M where\nx = zero\n"
+
 -- | One call against a fresh copy of the fixture, and what the file and the
 -- stand-in held afterwards.
 data Trial a = Trial
@@ -10522,6 +10531,43 @@ withFileChanged (Left (FailFileChanged fc)) k = k fc
 withFileChanged (Left other) _ = pure . Fail $
   "expected a fileChanged failure, got: " <> T.unpack (failureText other)
 withFileChanged (Right _) _ = pure (Fail "expected a fileChanged failure, got an answer")
+
+-- | The cancellation the in-place tests throw at a call.
+data Cancelled = Cancelled deriving (Eq, Show)
+instance Exception Cancelled
+
+-- | A file held in memory, with the three operations of an in-place check
+-- over it ('InPlaceOps').  Each records the masking state it ran in, newest
+-- first, which no real file can report.
+data MemoryFile = MemoryFile
+  { mfBytes :: IORef BS.ByteString
+  , mfLog   :: IORef [(String, MaskingState)]
+  , mfOps   :: InPlaceOps
+  }
+
+memoryFile :: BS.ByteString -> IO MemoryFile
+memoryFile bytes = do
+  ref    <- newIORef bytes
+  logRef <- newIORef []
+  let note what = getMaskingState >>= \s -> modifyIORef' logRef ((what, s) :)
+  pure MemoryFile
+    { mfBytes = ref
+    , mfLog   = logRef
+    , mfOps   = InPlaceOps
+        { ipoRead  = note "read" >> Just <$> readIORef ref
+        , ipoWrite = \b -> note "write" >> writeIORef ref b
+        , ipoCheck = note "check" >> pure (fakeResult 0 False "")
+        }
+    }
+
+-- | cancelMeAndBlock: have another thread throw 'Cancelled' at this one, and
+-- then block, as a read or a write on a slow file system blocks.  A thread
+-- that an exception can reach while it is blocked takes it here.
+cancelMeAndBlock :: IO ()
+cancelMeAndBlock = do
+  self <- myThreadId
+  _    <- forkIO (throwTo self Cancelled)
+  threadDelay 100000
 
 -- | patchIsWhatAgdaRead: for every hole of the fixture in one encoding, the
 -- patch names the span Agda places the hole at, and applied to the original
@@ -10646,11 +10692,66 @@ patchApplyTests = do
         let marked = "\xFEFF-- a comment with {!!} and ? in it\nmodule M where\nx = {!!}\n"
         in allOf
              [ assertEqual "one hole, the code's" [(3, 5)] (positions marked)
-             , assertEqual "the code-only view blanks the comment and keeps the mark"
-                 ("\xFEFF" <> T.replicate 34 " ") (lineOf 1 (codeOnly PlainAgda marked))
-             , assertEqual "the mask keeps every character's place"
-                 (T.length marked) (T.length (maskNonCode LiterateMd marked))
+             , assertEqual "the code-only view blanks the comment and holds no mark"
+                 (T.replicate 34 " ") (lineOf 1 (codeOnly PlainAgda marked))
+             , assertEqual "the mask is of the text after the mark, every character of it in place"
+                 (T.length marked - 1) (T.length (maskNonCode LiterateMd marked))
              ]
+
+    , -- Line 1 of a marked file, as each line scan reads it (Copilot's review
+      -- of PR 371).  A view that kept the mark showed these scans a first
+      -- token of the mark and the keyword run together.
+      runTest "bom: a module header on line 1 of a marked file is found, named, and imported under" $
+        let body   = "module BomHeader where\nx : Set₁\nx = {!!}\n"
+            marked = "\xFEFF" <> body
+        in allOf
+             [ assertEqual "the module's name" (Just "BomHeader") (moduleNameOf PlainAgda marked)
+             , assertEqual "the import goes under the header, and the mark stays first"
+                 "\xFEFFmodule BomHeader where\nopen import AgdaDojang.Debug\nx : Set₁\nx = {!!}\n"
+                 (ensureDebugImport PlainAgda marked)
+             , assertEqual "each view is the unmarked text's"
+                 (codeOnly PlainAgda body, codeWithHoles PlainAgda body, maskNonCode LiterateMd body)
+                 ( codeOnly PlainAgda marked, codeWithHoles PlainAgda marked
+                 , maskNonCode LiterateMd marked )
+             ]
+
+    , runTest "bom: an import on line 1 of a marked file is an import" $
+        let body = "open import Data.Nat\nx = {!!}\n"
+        in assertEqual "the modules imported" ["Data.Nat"]
+             (map siModule (parseImports (codeOnly PlainAgda ("\xFEFF" <> body))))
+
+    , runTest "bom: a declaration on line 1 of a marked file is quoted whole, and without the mark" $
+        let body    = "x : Set₁\nx = Set\ny : Set₁\ny = Set\n"
+            quote s = quoteDeclaration 0 PlainAgda s 1 1 2
+        in allOf
+             [ assertEqual "the quote of the unmarked text"
+                 (Just (DeclQuote 1 2 "x : Set₁\nx = Set" 2)) (quote body)
+             , assertEqual "and of the marked one" (quote body) (quote ("\xFEFF" <> body))
+             -- The extent asked for on its own (the quote takes the mark off
+             -- before it asks), on clauses with no signature above them, so
+             -- that only the name read at the site says the second line is a
+             -- clause of the first.  Read one character to the left, the
+             -- name is the mark, and the extent stops at line 1.
+             , assertEqual "the extent of a marked text, asked directly, by the name at the site"
+                 (Just (1, 2))
+                 -- The mark is its own literal: "\xFEFFf" would be one
+                 -- character, the escape taking the f as a hex digit.
+                 (declarationLines PlainAgda ("\xFEFF" <> "f zero = zero\nf (suc n) = n\ng = f\n") 1 1 2)
+             ]
+
+    , runTest "bom: get_goal's fallback puts its import under a header on line 1 of a marked file" $ do
+        let body = "module BomHeader where\ndata N : Set where z : N\nx : N\nx = {!!}\n"
+        t <- trialOn "bom-header" "BomHeader.agda" (utf8Bom <> TE.encodeUtf8 body) exitsZero id $
+               \cfg file -> handleGetGoal injLanes cfg GetGoalParams
+                 { ggFilePath = file, ggHole = ByPosition 4 5, ggReload = False
+                 , ggRewrite = editorRewrite }
+        allOf
+          [ assert "agda was handed the mark, the header, and then the import"
+              (maybe False
+                 ((utf8Bom <> "module BomHeader where\nopen import AgdaDojang.Debug\n") `BS.isPrefixOf`)
+                 (trSeen t))
+          , assertEqual "the file is restored, mark and all" (Just (trOriginal t)) (trAfter t)
+          ]
 
     , runTest "positions: an offset and its position are inverse, in every encoding" $ allOf
         [ assertEqual (encName enc <> ": offsets that do not round-trip") []
@@ -10661,6 +10762,28 @@ patchApplyTests = do
         , let t     = asText enc
               first = if encBom enc then 1 else 0
         ]
+
+    , -- A CR LF pair, offset by offset.  Copilot's review of PR 371 read the
+      -- CR's position as mapping back to the LF; it maps back to the CR, at
+      -- the column where Agda, which has no CR, puts the line's end.
+      runTest "positions: in a CR LF line the CR sits at Agda's end of line, and each offset maps back to itself" $
+        let t = "ab\r\ncd\r\n" :: Text
+        in allOf
+             [ assertEqual "offset to position"
+                 [(1, 1), (1, 2), (1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4), (3, 1)]
+                 (map (positionOfOffset t) [0 .. 8])
+             , assertEqual "and back" (map Just [0 .. 8])
+                 [ offsetOfPosition l c t | o <- [0 .. 8], let (l, c) = positionOfOffset t o ]
+             , assertEqual "no column past the LF's" Nothing (offsetOfPosition 1 5 t)
+             ]
+
+    , -- What 'textPatch' asks of a span, and fill_hole's spans give it.
+      runTest "positions: no hole of the fixture starts or ends inside a CR LF pair, in any encoding" $ allOf
+        [ assertEqual (encName enc) []
+            [ (hsLine h, hsCol h)
+            | h <- findHoles PlainAgda t, o <- [hsStart h, hsEnd h]
+            , o > 0, T.index t (o - 1) == '\r' ]
+        | enc <- encodings, let t = asText enc ]
     ]
     <>
     [ runTest ("patch: applied to the original it gives the bytes agda was handed (" <> encName enc <> ")")
@@ -10900,6 +11023,61 @@ patchApplyTests = do
           , assertEqual "the file" (Just (trOriginal t)) (trAfter t)
           ]
 
+    , -- The two steps that touch the file (Copilot's review of PR 371).  A
+      -- local file's reads and writes do not block, so what a cancellation
+      -- does when it arrives inside one is shown on operations that do: the
+      -- same 'runInPlaceWith', over a file held in memory.
+      runTest "guard: each read and write of the file runs uninterruptibly, and the check does not" $ do
+        m <- memoryFile inPlaceOriginal
+        _ <- runInPlaceWith (mfOps m) "/mem/M.agda" inPlaceOriginal inPlacePatched (const False)
+        steps <- reverse <$> readIORef (mfLog m)
+        assertEqual "the steps, and the masking each ran in"
+          [ ("read", MaskedUninterruptible), ("write", MaskedUninterruptible)
+          , ("check", Unmasked)
+          , ("read", MaskedUninterruptible), ("write", MaskedUninterruptible) ]
+          steps
+
+    , runTest "guard: a call cancelled during the settlement still restores the file" $ do
+        m     <- memoryFile inPlaceOriginal
+        seen  <- newIORef (0 :: Int)
+        let ops = (mfOps m)
+              { ipoRead = do
+                  modifyIORef' seen (+ 1)
+                  n <- readIORef seen
+                  -- The second read is the settlement's.
+                  if n == 2 then cancelMeAndBlock else pure ()
+                  ipoRead (mfOps m)
+              }
+        r     <- try (runInPlaceWith ops "/mem/M.agda" inPlaceOriginal inPlacePatched (const False))
+        after <- readIORef (mfBytes m)
+        allOf
+          [ assertEqual "the file" inPlaceOriginal after
+          , assertEqual "the cancellation reached the call, after the restore" (Left Cancelled)
+              (either Left (const (Right ())) r)
+          ]
+
+    , runTest "guard: a call cancelled while the patch is being written puts the original back, and runs no agda" $ do
+        m <- memoryFile inPlaceOriginal
+        let ops = (mfOps m)
+              { ipoWrite = \b ->
+                  if b /= inPlacePatched then ipoWrite (mfOps m) b else do
+                    -- Half of the patch is in the file when the call is
+                    -- cancelled; the write then blocks, and ends.
+                    writeIORef (mfBytes m) (BS.take (BS.length b `div` 2) b)
+                    cancelMeAndBlock
+                    writeIORef (mfBytes m) b
+              }
+        r     <- try (runInPlaceWith ops "/mem/M.agda" inPlaceOriginal inPlacePatched (const True))
+        after <- readIORef (mfBytes m)
+        steps <- map fst . reverse <$> readIORef (mfLog m)
+        allOf
+          [ assertEqual "the file" inPlaceOriginal after
+          , assertEqual "the cancellation reached the call" (Left Cancelled)
+              (either Left (const (Right ())) r)
+          , assertEqual "the guard's read, then the settlement's read and its restore; no check"
+              ["read", "read", "write"] steps
+          ]
+
     , runTest "guard: the failure a client reads names the file, the moment, and both texts" $
         let fc = FileChanged "/abs/F.agda" ChangedDuringCheck "sha256:aa" (Just "sha256:bb")
             v  = Aeson.toJSON fc
@@ -10940,7 +11118,7 @@ patchApplyTests = do
              , assert "--no-apply: the description promises no apply"
                  (not ("apply" `T.isInfixOf` descOf refusing))
              , assert "--no-apply: it says the candidate is written back by the caller"
-                 ("you write back yourself" `T.isInfixOf` descOf refusing)
+                 ("to keep a candidate, write it back yourself" `T.isInfixOf` descOf refusing)
              , assertEqual "both descriptions fit what a client reads" []
                  [ T.length d | d <- [descOf corpusConfig, descOf refusing], T.length d > clientCap ]
              , assert "the unit is stated where every position is, in the instructions"
@@ -11085,6 +11263,22 @@ patchApplyIntegrationTests cfg = do
           [ assertEqual "status" FillTypeError (frStatus fr)
           , assertEqual "applied" (Just False) (frApplied fr)
           , assertEqual "the file" orig after
+          ]
+
+    , -- Agda's side of the mark and the header (Copilot's review of PR 371):
+      -- the import the fallback puts under a header on line 1 of a marked
+      -- file is one Agda reads, and the goal comes back.
+      runTest "bom: get_goal's fallback answers the goal of a marked file whose header is on line 1" $ do
+        let bytes = utf8Bom <> TE.encodeUtf8
+              "module BomHeader where\ndata N : Set where z : N\nx : N\nx = {!!}\n"
+        file     <- copyAs "bom-header" bytes "BomHeader.agda"
+        injLanes <- injectionOnlyLanes
+        r        <- goalAt injLanes file (4, 5)
+        after    <- BS.readFile file
+        withRight r $ \info -> allOf
+          [ assertEqual "the goal" "N" (giGoal info)
+          , assertEqual "the module, as Agda names it" (Just "BomHeader") (giModule info)
+          , assertEqual "the file is restored, mark and all" bytes after
           ]
 
     , -- The issue's first design point.  The lane keeps the load it made; an
