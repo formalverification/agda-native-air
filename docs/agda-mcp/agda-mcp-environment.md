@@ -63,9 +63,9 @@ Verified after the fix, from the same foreign working directory:
 | flake shellHook | `$AGDA_DIR/defaults` | every shell entry | gitignored |
 | sbt version probe | `$ROOT/target/` | every shell entry of a shell whose banner probes sbt | gitignored |
 | `agda` (the typechecker) | `*.agdai` beside each checked source | every check that re-typechecks from source | gitignored |
-| `agda-mcp` itself | nothing | — | — |
+| `agda-mcp` itself | the requested source file, when a `fill_hole` call passes `apply: true` and Agda accepts the candidate (issue #136) | on that call; never on a server started with `--no-apply` | the file's own status |
 
-The server writes no state of its own.  `get_goal` and `fill_hole` do rewrite the requested source file transiently, but restore it byte for byte under `bracket_` — including on the timeout path, which the test suite pins.
+The server writes no state of its own.  `get_goal` and `fill_hole` do rewrite the requested source file transiently, and restore it byte for byte, on the timeout path too, which the test suite pins.  Since issue #136 each of those writes is made only after the file is found to hold the bytes the server read or wrote, so a save another writer makes during a check is kept and the call fails, naming the file (a save in the fraction of a millisecond between a comparison and its write is the exception); and the one text that stays is a candidate a call asked `fill_hole` to apply.
 
 Two further environment facts an operator needs.
 

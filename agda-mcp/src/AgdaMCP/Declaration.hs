@@ -21,7 +21,13 @@
 --     is the name's range alone), so the extent is cut by Agda's layout rule
 --     over the source, read in the 'AgdaMCP.Holes.codeWithHoles' view
 --     (literate prose, comments, and pragmas blanked, holes kept, every
---     position preserved).  Let @i@ be the indentation of the binding site's
+--     position preserved).  The site's line and column are Agda's, and Agda
+--     counts in the text after a leading byte-order mark, so that is the text
+--     read here and the text quoted: the mark is taken off first
+--     ('AgdaMCP.Holes.bomSplit'), or the name at a site on line 1 of a marked
+--     file would be read one character to the left, and a quote that opens on
+--     that line would carry a mark into whatever it is pasted into (Copilot's
+--     review of PR 371).  Let @i@ be the indentation of the binding site's
 --     line.  A later line belongs to the declaration when it is indented
 --     deeper than @i@ (a continuation, a clause body, a @where@ block, a
 --     constructor or a field), when it lies inside a hole that began on an
@@ -63,7 +69,7 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import AgdaMCP.Holes (HoleSpan (..), LiterateFlavour, codeWithHoles, findHoles)
+import AgdaMCP.Holes (HoleSpan (..), LiterateFlavour, bomSplit, codeWithHoles, findHoles)
 
 -- | A quotation of one declaration.
 --
@@ -77,7 +83,8 @@ data DeclQuote = DeclQuote
   , dqText        :: Text  -- ^ Those lines, byte for byte: the file's text
                            --   from the start of the first to the end of the
                            --   last, its line endings (CRLF included) as
-                           --   written, without the last line's newline.
+                           --   written, without the last line's newline and
+                           --   without a byte-order mark that opens line 1.
   , dqDeclEndLine :: Int   -- ^ The declaration's last line, by the layout rule.
   } deriving (Eq, Show)
 
@@ -91,7 +98,7 @@ defaultQuoteLines = 40
 -- the whole declaration); 'Nothing' when the file has no such line.
 quoteDeclaration
   :: Int -> LiterateFlavour -> Text -> Int -> Int -> Int -> Maybe DeclQuote
-quoteDeclaration maxLines flav src line col endCol = do
+quoteDeclaration maxLines flav marked line col endCol = do
   (start, end) <- declarationLines flav src line col endCol
   -- Compared before it is added, so a huge maxLines (the wire accepts any
   -- Int, maxBound included) cannot overflow past the declaration's end.
@@ -105,6 +112,9 @@ quoteDeclaration maxLines flav src line col endCol = do
     , dqDeclEndLine = end
     }
   where
+    -- The text Agda reads: the file's, after a leading byte-order mark.
+    src = snd (bomSplit marked)
+
     -- Split on LF alone and rejoin with it, so a CRLF file's carriage returns
     -- stay where they were and the quote is the file's own text for the range.
     raw = T.splitOn "\n" src
@@ -113,10 +123,12 @@ quoteDeclaration maxLines flav src line col endCol = do
 -- site at @(line, col)@ to @endCol@ opens, by the layout rule of the module
 -- header; 'Nothing' when the file has no such line.
 declarationLines :: LiterateFlavour -> Text -> Int -> Int -> Int -> Maybe (Int, Int)
-declarationLines flav src line col endCol
+declarationLines flav marked line col endCol
   | line < 1 || line > length view = Nothing
   | otherwise = Just (start, go start (drop start numbered))
   where
+    -- The text Agda reads; every line, column, and offset below is into it.
+    src      = snd (bomSplit marked)
     view     = T.splitOn "\n" (codeWithHoles flav src)
     numbered = zip [1 ..] view
     at k     = maybe "" id (lookup k numbered)

@@ -91,6 +91,16 @@
 --   are new keys, so this too is additive and the schema version is
 --   unchanged.
 --
+--   @fill_hole@ takes @apply@ and @patch@ (issue #136).  By default it
+--   answers as it always has and restores the file; @patch: true@ adds
+--   @patch@, a 'TextPatch': the edit that was checked, as something a client
+--   applies to its own text; @apply: true@ adds @applied@, whether the server
+--   left an accepted candidate in the file.  A file that another writer
+--   changed while it was checked is a failure of a kind of its own,
+--   'FailFileChanged'.  All of it is new keys and a new failure kind, so a
+--   call that passes neither argument gets the answer it got before, byte
+--   for byte, and the schema version is unchanged.
+--
 --   The corpus types track the agda-strux JSONL schema (v0.01) documented in
 --   docs/representation.md.  They are used by the search tools (M1-3).
 
@@ -137,6 +147,10 @@ module AgdaMCP.Types
     -- * Tool results (outbound)
   , ToolFailure (..)
   , TimeoutFailure (..)
+  , FileChanged (..)
+  , FileChangedWhen (..)
+  , fileChangedMessage
+  , TextPatch (..)
   , GoalInfo (..)
   , HoleInfo (..)
   , HoleAddressed (..)
@@ -419,11 +433,21 @@ data FillHoleParams = FillHoleParams
   , fhHole      :: HoleRef    -- ^ Which hole: by position or by index (#79),
                               --   or none in a one-hole file (#201).
   , fhCandidate :: Text       -- ^ The candidate proof term to try.
+  , fhApply     :: Bool       -- ^ Leave the candidate in the file when its
+                              --   status is ok (issue #136); False restores
+                              --   the file on every status, as always.
+  , fhPatch     :: Bool       -- ^ Answer the edit that was checked as a
+                              --   'TextPatch' (issue #136).
   } deriving (Eq, Show)
 
+-- | @apply@ and @patch@ are optional and default to False, and a @null@
+-- counts as absent, the leniency every optional argument of this server has
+-- (issue #184): a call that names neither is the call it was before #136.
 instance FromJSON FillHoleParams where
   parseJSON = withObject "FillHoleParams" $ \o ->
     FillHoleParams <$> o .: "filePath" <*> parseHoleRef o <*> o .: "candidate"
+                   <*> (o .:? "apply" .!= False)
+                   <*> (o .:? "patch" .!= False)
 
 -- | Parameters for the @check_file@ tool.
 --
@@ -1033,7 +1057,70 @@ data ToolFailure
                                 -- ^ The interaction lane's process failed the
                                 --   call — a spawn failure, a timeout kill, or
                                 --   a crash; rendered as JSON (issue #75).
+  | FailFileChanged FileChanged -- ^ Another writer changed the file under an
+                                --   in-place check; rendered as JSON (issue
+                                --   #136).
   deriving (Eq, Show)
+
+-- | When, relative to the in-place check, the file was found changed.
+data FileChangedWhen
+  = ChangedBeforeCheck  -- ^ Between this call's read of the file and its
+                        --   write of the patched text: nothing was written
+                        --   and Agda was not run.
+  | ChangedDuringCheck  -- ^ Between the write of the patched text and the end
+                        --   of Agda's run: the file no longer held the bytes
+                        --   the server wrote, so it was neither restored nor
+                        --   kept, and the run's result is not a verdict.
+  deriving (Eq, Show)
+
+-- | The payload of 'FailFileChanged' (issue #136): a file that @get_goal@'s
+-- fallback or @fill_hole@ was checking in place was changed by someone else.
+--
+-- The in-place tools write a patched text over the file, run Agda, and put the
+-- original back.  Before #136 the last step was unconditional, so a save made
+-- during the run (an editor beside the agent) was overwritten by the restore,
+-- and the run's verdict was reported though Agda might have read either text.
+-- Now the server writes only over bytes it knows: the patched text goes over
+-- the bytes this call read, and the restore (or, for an applied candidate,
+-- the decision to keep) happens only while the file still holds the bytes the
+-- server wrote.  Otherwise the file is left exactly as the other writer left
+-- it and the call fails with this payload, which names both texts by digest
+-- so a client can tell which one it holds.
+data FileChanged = FileChanged
+  { fchFile     :: FilePath        -- ^ The file, as resolved.
+  , fchWhen     :: FileChangedWhen
+  , fchExpected :: Text            -- ^ Digest of the bytes the server expected
+                                   --   to find: the ones it read (before the
+                                   --   check) or wrote (during it).
+  , fchFound    :: Maybe Text      -- ^ Digest of the bytes it found; Nothing
+                                   --   when the file could not be read at all
+                                   --   (removed, say).
+  } deriving (Eq, Show)
+
+-- | fileChangedMessage: the failure as a sentence a model can act on.
+fileChangedMessage :: FileChanged -> Text
+fileChangedMessage c = case fchWhen c of
+  ChangedBeforeCheck -> T.concat
+    [ T.pack (fchFile c), " changed on disk between this call's read of it and"
+    , " its write: nothing was written and agda was not run. Read the file"
+    , " again and repeat the call." ]
+  ChangedDuringCheck -> T.concat
+    [ T.pack (fchFile c), " was changed on disk by another writer while agda"
+    , " was checking it. The file was left as that writer left it: nothing was"
+    , " restored and nothing applied. No verdict is given, because agda may"
+    , " have read either text. Read the file again and repeat the call." ]
+
+instance ToJSON FileChanged where
+  toJSON c = object
+    [ "error"       .= fileChangedMessage c
+    , "fileChanged" .= object (
+        [ "file"     .= fchFile c
+        , "when"     .= (case fchWhen c of
+                           ChangedBeforeCheck -> "before the check" :: Text
+                           ChangedDuringCheck -> "during the check")
+        , "expected" .= fchExpected c
+        ] <> maybe [] (\d -> ["found" .= d]) (fchFound c))
+    ]
 
 -- | The structured payload of a timed-out tool call: what went wrong, and what
 -- the call still managed to measure on the way down.
@@ -1206,6 +1293,15 @@ data FillResult = FillResult
   , frVerdict   :: Verdict        -- ^ What was run and what @status@ means (#72).
   , frCommand   :: CommandEcho    -- ^ The resolved agda command line (#72).
   , frProject   :: ProjectContext -- ^ The tree that was checked (#76).
+  , frApplied   :: Maybe Bool     -- ^ Did the server leave the candidate in the
+                                  --   file (#136)?  Nothing, and the key
+                                  --   omitted, unless the call passed
+                                  --   @apply: true@; then True exactly when
+                                  --   the status is ok, False when the file
+                                  --   was restored.
+  , frPatch     :: Maybe TextPatch -- ^ The edit that was checked (#136);
+                                  --   Nothing, and the key omitted, unless the
+                                  --   call passed @patch: true@.
   } deriving (Eq, Show)
 
 instance ToJSON FillResult where
@@ -1221,6 +1317,71 @@ instance ToJSON FillResult where
     ] <> maybe [] (\m -> ["message"  .= m]) (frMessage r)
       <> maybe [] (\n -> ["remainingHoles" .= n]) (frRemainingHoles r)
       <> maybe [] (\b -> ["checkedFromSource" .= b]) (frCheckedFromSource r)
+      <> maybe [] (\b -> ["applied" .= b]) (frApplied r)
+      <> maybe [] (\p -> ["patch"   .= p]) (frPatch r)
+
+-- | A text edit, as a client applies it to its own copy of a file (issue #136).
+--
+-- It says: in the file whose bytes have the digest 'tpDigest', the text
+-- 'tpOldText' at 'tpRange' (equally, the bytes from 'tpByteStart' to
+-- 'tpByteEnd') becomes 'tpNewText', and the file's bytes then have the digest
+-- 'tpResultDigest'.  It carries no verdict: for @fill_hole@ it is the edit
+-- that was checked, whatever Agda said of it, and the answer's @status@ is the
+-- verdict.
+--
+-- The positions are in two units, for the two things a client may hold.
+--
+--   * 'tpRange', for a client that holds a text (an editor's buffer): 1-based
+--     lines and columns, the end exclusive, in the coordinates every hole
+--     list of this server uses ('AgdaMCP.Holes'): a line ends at LF, a column
+--     counts Unicode code points, and a leading byte-order mark has no
+--     column.  These are Agda's own positions.  A client converts the column
+--     to its own unit within the line: a language whose strings index code
+--     points (Python, Haskell's Text, Emacs Lisp) uses it as it is; one that
+--     indexes UTF-16 units (JavaScript, the JVM, VS Code) adds one for every
+--     code point above U+FFFF before the position on that line; Emacs moves
+--     by @forward-line@ and @forward-char@, never @move-to-column@, which
+--     counts display columns.
+--   * 'tpByteStart' and 'tpByteEnd', for a client that holds the file: 0-based
+--     offsets into its bytes, the end exclusive.  They need no convention at
+--     all, which is why they are here: a byte-order mark and every carriage
+--     return are bytes like any other.
+--
+-- Before it writes, a client checks that the text it holds is the text that
+-- was checked: its digest equals 'tpDigest', or, for a buffer whose bytes it
+-- cannot name, the text at 'tpRange' is 'tpOldText'.  'tpNewText' is spliced
+-- as it is: nothing is added around it, no parentheses, and its line ends are
+-- its own.
+--
+-- The shape is not @fill_hole@'s alone.  A refinement's replacement holds new
+-- holes (issue #209), and a case split replaces a whole clause, on several
+-- lines (issue #207); both are a range, the text it held, and the text that
+-- replaces it.
+data TextPatch = TextPatch
+  { tpFile         :: FilePath   -- ^ The file, as resolved (absolute).
+  , tpDigest       :: Text       -- ^ 'AgdaMCP.Digest.sourceDigest' of the
+                                 --   file's bytes as the server read them.
+  , tpRange        :: DiagRange  -- ^ Where 'tpOldText' sits; end exclusive.
+  , tpByteStart    :: Int        -- ^ 0-based offset of its first byte.
+  , tpByteEnd      :: Int        -- ^ 0-based offset one past its last byte.
+  , tpOldText      :: Text       -- ^ What the range holds.
+  , tpNewText      :: Text       -- ^ What replaces it, exactly.
+  , tpResultDigest :: Text       -- ^ The digest of the file's bytes with the
+                                 --   edit made: for @fill_hole@, the bytes
+                                 --   Agda judged, and the bytes an apply
+                                 --   leaves in the file.
+  } deriving (Eq, Show)
+
+instance ToJSON TextPatch where
+  toJSON p = object
+    [ "file"         .= tpFile p
+    , "digest"       .= tpDigest p
+    , "range"        .= tpRange p
+    , "bytes"        .= object [ "start" .= tpByteStart p, "end" .= tpByteEnd p ]
+    , "oldText"      .= tpOldText p
+    , "newText"      .= tpNewText p
+    , "resultDigest" .= tpResultDigest p
+    ]
 
 -- | Severity level for a diagnostic.
 data DiagSeverity = DiagError | DiagWarning | DiagInfo

@@ -83,6 +83,17 @@
 --     context's defined names (@Group α ρ@, not the 528-character Σ type it
 --     abbreviates), and each answer names the mode that printed it.  Until
 --     then both sent @Normalised@; search_in_scope still does.
+--
+-- Issue #136 additions:
+--   * fill_hole takes @apply@ (leave an accepted candidate in the file) and
+--     @patch@ (answer the edit that was checked, for a client that applies it
+--     to its own copy); a call that passes neither is the call it was.
+--   * @--no-apply@ ('scNoApply'): the operator's refusal of the first.  The
+--     schema then declares no @apply@, the description promises none, and a
+--     call that passes it is refused by name before anything runs, so a
+--     server registered beside an editor leaves no lasting change in a file.
+--   * The hole model's unit is stated where every tool's positions are, in
+--     the instructions: a column counts code points.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -131,8 +142,9 @@ import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
 import AgdaMCP.Tools.SearchInScope (handleSearchInScope)
 import AgdaMCP.Types
-  ( CorpusIndex, Rewrite, SearchByNameParams (..), ToolFailure (..)
-  , Verbosity (..), answerAt, defaultExportsLimit, editorRewrite, rewriteText )
+  ( CorpusIndex, FillHoleParams (..), Rewrite, SearchByNameParams (..)
+  , ToolFailure (..), Verbosity (..), answerAt, defaultExportsLimit
+  , editorRewrite, rewriteText )
 
 -- ---------------------------------------------------------------------------
 -- Configuration
@@ -160,6 +172,10 @@ data ServerConfig = ServerConfig
   , scAuto        :: Bool
     -- ^ Register the auto tool (@--auto@, issue #205); off by default, so
     --   the default surface is unchanged.
+  , scNoApply     :: Bool
+    -- ^ Refuse fill_hole's @apply@ (@--no-apply@, issue #136): the server
+    --   then restores every file it patches, whatever a call asks.  Off by
+    --   default, since an apply is itself opt-in per call.
   } deriving (Show)
 
 
@@ -286,10 +302,15 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
           [addressAlternatives]
 
       , toolDefWith "fill_hole"
-          ("Try a candidate term in a hole: splice it over the hole's span, \
-           \typecheck the patched file in place with batch agda, and restore \
-           \the file byte for byte, so a candidate you keep you write back \
-           \yourself. " <> holeAddressing
+          ("Try a candidate term in a hole: splice it over the hole's span \
+           \exactly as sent (no parentheses are added), typecheck the patched \
+           \file in place with batch agda, and restore the file byte for byte"
+           <> (if scNoApply cfg
+                 then "; to keep a candidate, write it back yourself"
+                 else "; apply:true instead keeps a candidate whose status is \
+                      \\"ok\" (applied says whether it did)")
+           <> ". patch:true adds the edit as patch, for a client that edits \
+              \its own copy. " <> holeAddressing
            <> " status is \"ok\" if and only if agda exits 0, or fails with \
               \nothing but [UnsolvedInteractionMetas]: holes still open in the \
               \file, including a new sub-hole inside the candidate, which is a \
@@ -300,17 +321,22 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
               \never judged (the file is still restored); \"crash\" means agda \
               \could not start. verdict {exitCode} is agda's own. EVERY answer \
               \carries holes [{index, line, col, goal}] and remainingHoles: \
-              \the file's holes AS THIS CANDIDATE LEAVES IT, so once you write \
-              \the candidate back you re-anchor on the next hole without a \
-              \second call; until you do, the file keeps the holes it had.")
-          [ prop "filePath"  "string"  filePathDoc
-          , prop "line"      "integer" lineDoc
-          , prop "column"    "integer" columnDoc
-          , prop "col"       "integer" colDoc
-          , prop "holeIndex" "integer" holeIndexDoc
-          , prop "candidate" "string"  "The candidate proof term to try."
-          , prop "verbose"   "boolean" verboseDoc
-          ]
+              \the file's holes AS THIS CANDIDATE LEAVES IT, so once the \
+              \candidate is in the file you re-anchor on the next hole without \
+              \a second call; until then, the file keeps the holes it had.")
+          ([ prop "filePath"  "string"  filePathDoc
+           , prop "line"      "integer" lineDoc
+           , prop "column"    "integer" columnDoc
+           , prop "col"       "integer" colDoc
+           , prop "holeIndex" "integer" holeIndexDoc
+           , prop "candidate" "string"  "The candidate proof term to try."
+           ]
+           -- Declared only where the server honors it: a schema is what a
+           -- client reads to decide what to send (issue #136).
+           <> [ prop "apply" "boolean" applyDoc | not (scNoApply cfg) ]
+           <> [ prop "patch"   "boolean" patchDoc
+              , prop "verbose" "boolean" verboseDoc
+              ])
           ["filePath", "candidate"]
           [addressAlternatives]
 
@@ -699,9 +725,9 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           \(absent: unknown, never a guess)."
       , unless' (not (null holeTools)) $
           "HOLES: every Agda hole syntax ({!!}, {! e !}, ?) in .agda and every \
-          \literate flavour Agda 2.8 supports, never inside comments, strings, \
-          \or literate prose; positions are 1-based (line, col) in the file as \
-          \written"
+          \literate flavour Agda reads, never inside comments, strings, \
+          \or literate prose; positions are 1-based (line, col), col in code \
+          \points, in the file as written"
           <> unless' (not (null listers))
                ("; " <> T.intercalate ", " listers
                 <> (if one listers then " lists" else " list")
@@ -901,6 +927,27 @@ rewriteDefaultNote =
 -- to ask for more, is said once in 'serverInstructions'.
 verboseDoc :: Text
 verboseDoc = "Default false; true adds the full echo."
+
+-- | applyDoc / patchDoc: fill_hole's two ways of handing a candidate over
+-- (issue #136), at the properties where a client decides what to send.
+--
+-- @patchDoc@ carries the units, because the client that reads a patch is the
+-- one that can get them wrong: strux-driver once indexed Agda's columns as
+-- UTF-16 units and spliced at a shifted offset on every line holding an
+-- astral glyph (ADR 0001, decision 16).  What each unit is for, and how each
+-- kind of client converts, is in the README.
+applyDoc :: Text
+applyDoc =
+  "Default false; true leaves the candidate in the file when status is \
+  \\"ok\" (applied: true) and restores the file otherwise."
+
+patchDoc :: Text
+patchDoc =
+  "Default false; true adds patch {file, digest, range, bytes, oldText, \
+  \newText, resultDigest}: the edit that was checked, whatever the status. \
+  \range is 1-based, columns in CODE POINTS (not UTF-16 units), end \
+  \exclusive; bytes are 0-based offsets into the file; digest and \
+  \resultDigest are sha256 of the file's bytes before and after."
 
 -- | maxLinesDoc: how much of each definition @definition_of@ quotes (issue
 -- #185), in the spelling of @exports_of@'s @limit@.
@@ -1474,7 +1521,14 @@ dispatchTool cfg lanes v "get_goal" args =
 
 dispatchTool cfg _lanes v "fill_hole" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp v <$> handleFillHole (scAgdaConfig cfg) p
+    -- The operator's refusal (issue #136), by name and before anything runs:
+    -- a call that asked for a lasting change must not get a silent restore.
+    Aeson.Success p
+      | fhApply p, scNoApply cfg -> pure $ toolError
+          "apply is refused: this server was started with --no-apply, so it \
+          \restores every file it patches. Call fill_hole without apply; \
+          \patch:true answers the edit, for you to make yourself."
+      | otherwise -> failureToMcp v <$> handleFillHole (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg lanes v "check_file" args =
@@ -1612,6 +1666,7 @@ failureToMcp v = either render (okToMcp v)
     render (FailProject pm)      = structuredError (toJSON pm)
     render (FailPath pf)         = structuredError (toJSON pf)
     render (FailInteraction xf)  = structuredError (toJSON xf)
+    render (FailFileChanged fc)  = structuredError (toJSON fc)
 
     structuredError payload = object
       [ "content" .= [ object [ "type" .= ("text" :: Text)

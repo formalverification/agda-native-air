@@ -162,7 +162,7 @@ This is the minimum tooling required for an agent to do interactive proof develo
 | Tool | Description |
 |------|-------------|
 | `get_goal`         | Inspect the goal type and local context at a hole — answered by the interaction lane when it can (no file mutation, millisecond-warm), by the reporting-macro injection otherwise; the response's `source` field says which. |
-| `fill_hole`        | Substitute a candidate term into a hole and typecheck. |
+| `fill_hole`        | Substitute a candidate term into a hole and typecheck; on request, leave an accepted candidate in the file (`apply`) or answer the edit for a client to make (`patch`). |
 | `check_file`       | Load/reload an Agda file and return all diagnostics. |
 | `get_diagnostics`  | Lightweight summary: error/warning counts, open holes with positions. |
 
@@ -295,7 +295,92 @@ One lexical scan serves the scans that are not about holes, too.  The `AgdaDojan
 +  A request carries at most one address.  Both spellings at once is rejected (they can disagree, and choosing one silently is how a call fills the wrong hole), as are half a position (a `line` with no column) and both `column` and `col` together.  The input schema's `oneOf` names the four shapes a legal request has (an index, a position under either column spelling, or no address): every request it admits parses to the address it describes, and every combination of the keys it refuses, the parser refuses too (the suite checks all sixteen).
 +  Positions are read in the file as written, so a literate file's holes are addressed in literate-file coordinates and its prose decoys are addressable by nothing.
 
-**Every answer re-anchors**.  `check_file` and `fill_hole` return the full hole list (the same `[{index, line, col, goal}]` shape `get_diagnostics` already returned) so a client never recomputes a position.  `fill_hole`'s list describes the file *as that candidate leaves it*, which is what the client will have once it keeps the candidate; the bytes on disk are restored either way, so until the candidate is written back the file still has the holes it started with.
+**Every answer re-anchors**.  `check_file` and `fill_hole` return the full hole list (the same `[{index, line, col, goal}]` shape `get_diagnostics` already returned) so a client never recomputes a position.  `fill_hole`'s list describes the file *as that candidate leaves it*, which is what the client will have once it keeps the candidate.  The bytes on disk are restored unless the call asked for the candidate to stay ([`apply`](#keeping-a-candidate-apply-and-patch-issue-136)), so until the candidate is in the file, the file still has the holes it started with.
+
+### Keeping a candidate: `apply` and `patch` (issue #136)
+
+By default `fill_hole` restores the file after every check, so a candidate you keep has to reach the file some other way.  Two optional arguments say how, and a call that passes neither answers exactly as it did before they existed.
+
+| Argument | What it does | Who it is for |
+|----------|--------------|---------------|
+| `apply: true` | Leaves the candidate in the file when its `status` is `ok`, and restores the file on every other status.  The answer gains `applied`, `true` or `false`. | An agent working alone.  Its next call addresses the next hole of `holes`, and nothing is written back by hand. |
+| `patch: true` | Adds `patch`, the edit that was checked, on every status.  The file is restored, unless `apply` keeps the candidate. | A client that holds its own copy of the text: an editor applies the edit to its buffer, a script to the file's bytes. |
+
+**The candidate is spliced as it is sent**.  It replaces the hole's whole token (`{!!}`, `{! e !}` with its contents, or `?`), and nothing is added around it.  Agda's own give adds parentheses where the hole's place needs them; `fill_hole` does not, so `f x` for the hole of `g {!!}` is checked as `g f x`, and to check `g (f x)` the candidate is `(f x)`.  What is checked, what an apply writes, and what a patch says are therefore one text.
+
+**The patch**, here for `zero` in the first hole of [`test/resources/PatchUnits.agda`](test/resources/PatchUnits.agda), whose line 29 reads `g = f 𝑨 {!!}`:
+
+```json
+"patch": {
+  "file": "/abs/path/PatchUnits.agda",
+  "digest": "sha256:29e7e30e2c0bc3a698415b9624066c0a3461fb93c13bb08738ba953ed498dc36",
+  "range": {"startLine": 29, "startCol": 9, "endLine": 29, "endCol": 13},
+  "bytes": {"start": 969, "end": 973},
+  "oldText": "{!!}",
+  "newText": "zero",
+  "resultDigest": "sha256:5dd4a0bfac6ada253d545da11c523dccfd184c35c5893da3a8011206f0d6a9ed"
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `file` | The file, as the server resolved it (absolute). |
+| `digest` | `sha256:` and the SHA-256 of the file's bytes as the server read them: the text this edit applies to. |
+| `range` | Where `oldText` sits, for a client that holds a text.  1-based, and the end is exclusive, as Agda prints a range; a line ends at LF; a column counts Unicode **code points**; a leading byte-order mark is not counted.  These are the coordinates of every hole list, and they are Agda's. |
+| `bytes` | The same span for a client that holds the file: 0-based offsets into its bytes, the end exclusive. |
+| `oldText` | What the range holds: the hole's token. |
+| `newText` | What replaces it: the candidate, exactly. |
+| `resultDigest` | The SHA-256 of the file's bytes with the edit made.  These are the bytes Agda judged, and the bytes an `apply` leaves, so after an apply the next patch's `digest` is this one's `resultDigest`. |
+
+The glyph `𝑨` on that line is one code point, two UTF-16 units, and four UTF-8 bytes, so the hole starts 8 code points into its line, 9 UTF-16 units into it, and 11 bytes into it: three different numbers.  `range` counts the first (as column 9, since columns start at 1), and `bytes` counts bytes from the start of the file.
+
+**Applying it**.  Check that the text you hold is the text that was checked, and then write, as follows:
+
++  **You hold the file's bytes**.  Compare their SHA-256 with `digest`, replace the bytes from `bytes.start` up to `bytes.end` with the UTF-8 of `newText`, and compare the result with `resultDigest`.  Nothing is decoded and nothing is counted:
+
+   ```python
+   data = open(patch["file"], "rb").read()
+   assert "sha256:" + hashlib.sha256(data).hexdigest() == patch["digest"]
+   data = data[:patch["bytes"]["start"]] + patch["newText"].encode() + data[patch["bytes"]["end"]:]
+   assert "sha256:" + hashlib.sha256(data).hexdigest() == patch["resultDigest"]
+   open(patch["file"], "wb").write(data)
+   ```
+
++  **You hold a text** (an editor's buffer).  Go to `range`'s start by line and column, find `oldText` there, and replace it.  The column counts code points, so the conversion depends on what your strings count, as follows:
+
+   +  where they index code points (Python, Haskell's `Text`, Emacs Lisp), use the column as it is;
+   +  where they index UTF-16 units (JavaScript, the JVM, VS Code, CodeMirror), add one for every code point above U+FFFF before the position on that line;
+   +  in Emacs, `(forward-line (1- line))` and then `(forward-char (1- col))`, never `move-to-column`, which counts display columns and stops a character short after a wide one (measured in Emacs 29.3 after `漢`).
+
+   A buffer normally holds neither a byte-order mark nor the CR of a CR LF (Emacs 29.3 takes both off when it decodes a file), and the positions count neither, so they are a buffer's positions as they are.
+
++  **Finding `oldText` at the range does not prove the unit**.  On the fixture's line `q = f 𝑨 (f 𝑨 (f ? ?))` the second hole's column, read as a count of UTF-16 units, is the first hole's place, where the same `?` sits; a client counting that way fills the wrong hole and nothing in `oldText` warns it.  The suite applies the patch both ways to show it.  `resultDigest` catches it.
+
+`newText` is written as it is: nothing is added around it, and its line ends are its own, so a candidate that holds an LF leaves an LF in a CR LF file.
+
+**A patch is not a verdict**.  It says what was tried, and `status` says what Agda made of it.  It is answered for a `type_error` too, since a refused candidate is still something a person may want to edit, and for a `timeout` and a `crash`, where nothing was judged.
+
+**The file is written only over bytes the server knows**.  The check runs in place: the server writes the patched text over the file, runs Agda, and restores the original, or keeps the candidate.  An editor may save in the meantime, so the patched text goes over the file only while the file holds the bytes the call read, and the restore or the keep happens only while it holds the bytes the server wrote.  A file found changed is left as the other writer left it, and the call fails with no `status`, since Agda may have read either text:
+
+```json
+{
+  "error": "/abs/M.agda was changed on disk by another writer while agda was checking it. The file was left as that writer left it: nothing was restored and nothing applied. No verdict is given, because agda may have read either text. Read the file again and repeat the call.",
+  "fileChanged": {"file": "/abs/M.agda", "when": "during the check", "expected": "sha256:…", "found": "sha256:…"}
+}
+```
+
+`when` is `before the check` (the file changed between the call's read and its write: nothing was written and Agda was not run) or `during the check`; `expected` names the bytes the server read or wrote, and `found` the bytes it found, absent when the file could no longer be read.  `get_goal`'s fallback path patches the same way and fails the same way.  Before issue #136 the restore was unconditional, and a save made during a check was overwritten by it.
+
+**What the guard narrows, and what it leaves**.  A comparison and the write after it are separate system calls (a read, then a truncation and a write), so the guard shortens the time in which a save can be lost and does not end it.  Before, that time was the whole check, seconds to minutes; now it is the instant between a comparison and its write, twice per call.  Traced on the server over 30 calls (strace, ext4), the end of the read and the truncation were 0.12 to 0.51 ms apart before the check and 0.12 to 2.5 ms apart at the restore.  A save that lands there is overwritten.  Nothing in a file's interface closes that against a writer that takes no lock, which an editor does not: an advisory lock binds only the writers that ask for it, and replacing the file by a rename compares nothing either.  The two steps that touch the file cannot be interrupted, so a call that is cancelled inside one still leaves the file restored, or as the other writer left it; and a call with `apply` that is cancelled after Agda accepted its candidate restores it too, up to the instant the call returns.  A cancellation in that instant, or after the call has returned and before its answer is written, leaves the accepted candidate in the file and the call unanswered: a client that gets no answer reads the file again.  In the server a cancellation is SIGINT, after which it exits.
+
+**`--no-apply`** is the operator's refusal.  A server started with it never leaves a candidate in a file: its schema declares no `apply`, its description promises none, and a call that passes one is refused by name before anything runs.  Use it for a registration beside an editor that has the files open; such a client takes the patch.
+
+**After an apply** the file is the text Agda judged, so nothing else needs telling: the interaction lane re-loads the file at its next question (`lane.load: "changed"`), a batch tool's peek stops filling `goal` from the lane's old load until it has, and when the candidate closed the last hole, Agda has written the file's interface for exactly that text.
+
+**What this does not cover**.  Two things, each measured and each an open issue, as follows:
+
++  Agda ends a line at a lone CR, a form feed, NEL, LS, and PS as well as at LF; the server's scan, like an Emacs buffer, does not.  After one of those in a file the server's line numbers are one short of Agda's (issue #369).  None of 4,318 Agda sources examined holds one.
++  A server stopped by SIGTERM during a check exits at once and leaves the patched text in the file; and of two servers checking one file at once, one can restore the other's patched text.  Both were so before issue #136 (issue #370).
 
 ### Structured diagnostics (issue #74)
 
@@ -443,7 +528,7 @@ import, which is [issue #165](https://github.com/formalverification/agda-native-
 agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
          [--corpus PATH]  [--timeout N] [--verbose]
          [--check-command "CMD ARGS ..."] [--check-timeout N]
-         [--expose NAME,NAME,...] [--auto]
+         [--expose NAME,NAME,...] [--auto] [--no-apply]
          [--agda-identity-command "CMD ARGS ..."] [--agda-identity-ttl N]
 ```
 
@@ -458,6 +543,7 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
 | `--expose NAMES`     | Present only these tools (comma-separated, issue #191): `tools/list` lists them alone, the `initialize` instructions name them alone, and a call to any other registered tool is refused by name.  Without it every registered tool is presented but `search_in_scope`, which only this flag presents (issue #203).  A name this configuration does not register (a typo, or a corpus tool without `--corpus`) is a fatal startup error, never a silently smaller surface. |
 | `--auto`             | Register the `auto` tool, Agda's own proof search at a hole (issue #205).  Off by default; `--expose` may name `auto` only when this flag registers it. |
+| `--no-apply`         | Refuse `fill_hole`'s `apply` (issue #136): the server restores every file it patches whatever a call asks, declares no `apply` in the schema, and refuses by name a call that passes one.  For a registration beside an editor; see [Keeping a candidate](#keeping-a-candidate-apply-and-patch-issue-136). |
 | `--agda-identity-command "..."` | A command whose standard output names the Agda that `--agda-bin` would start, for what the binary's path and bytes cannot show (issue #347).  Split on whitespace and run with no shell, in the server's working directory; for `scripts/agda-for-flake.sh`, name it with `--print-key`, which prints the key the launcher would build under.  Its output joins the stamp each interaction lane is compared with before reuse, and a lane whose stamp differs is restarted (see *Live queries over the interaction lane*).  A failing command is part of the stamp, named by how it failed. |
 | `--agda-identity-ttl N` | Seconds the identity command's output stands before a lane call runs it again (default: 2; `0` runs it before every call).  A spawn always runs it afresh. |
 | `--verbose`          | Emit debug output to stderr. |
@@ -530,6 +616,8 @@ agda-mcp/
 │       ├── Agda.hs              ← Agda subprocess interaction + marker parsing
 │       ├── Diagnostics.hs       ← Agda output → structured diagnostics: codes, ranges, involved
 │       ├── Holes.hs             ← The hole model: literate masking, lexical scan, code-only view
+│       ├── Patch.hs             ← A text edit as a client applies it: fill_hole's patch
+│       ├── Digest.hs            ← SHA-256, the digest that names a patch's two texts
 │       ├── Project.hs           ← Root resolution: nearest *.agda-lib, registry, mismatch
 │       ├── Gate.hs              ← Which command is the project's gate: make target, configured, Everything
 │       ├── Interaction.hs       ← The interaction lane: persistent agda --interaction-json child per root
@@ -620,7 +708,7 @@ was asked, as in the example above.  Until #248 the lane sent `Normalised`.
 
 Submit a candidate term for a hole and receive typecheck feedback: success (hole filled, possibly generating new sub-holes) or failure (error message with location).
 
-**Input**.  Addressed like `get_goal`: by position, by index, or, in a file with exactly one hole, not at all.
+**Input**.  Addressed like `get_goal`: by position, by index, or, in a file with exactly one hole, not at all.  `apply` and `patch` are optional booleans, false by default; see [Keeping a candidate](#keeping-a-candidate-apply-and-patch-issue-136).
 
 ```json
 {
@@ -662,6 +750,37 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 }
 ```
 
+**Output (applied, with its patch)**.  With `apply: true` and `patch: true`, for `zero` in the first of the five holes of `test/resources/PatchUnits.agda`.  `applied` is on every answer of a call that passed `apply`, `false` when the file was restored; `patch` is on every answer of a call that passed `patch`, whatever the status.
+
+```json
+{
+  "status": "ok",
+  "applied": true,
+  "candidate": "zero",
+  "addressed": {"line": 29, "col": 9, "resolvedBy": "span"},
+  "holes": [
+    {"index": 0, "line": 33, "col": 9, "goal": "?"},
+    {"index": 1, "line": 37, "col": 7, "goal": "?"},
+    {"index": 2, "line": 44, "col": 17, "goal": "?"},
+    {"index": 3, "line": 44, "col": 19, "goal": "?"}
+  ],
+  "remainingHoles": 4,
+  "patch": {
+    "file": "/abs/path/PatchUnits.agda",
+    "digest": "sha256:29e7e30e2c0bc3a698415b9624066c0a3461fb93c13bb08738ba953ed498dc36",
+    "range": {"startLine": 29, "startCol": 9, "endLine": 29, "endCol": 13},
+    "bytes": {"start": 969, "end": 973},
+    "oldText": "{!!}",
+    "newText": "zero",
+    "resultDigest": "sha256:5dd4a0bfac6ada253d545da11c523dccfd184c35c5893da3a8011206f0d6a9ed"
+  },
+  "elapsedMs": 33,
+  "checkedFromSource": true,
+  "verdict": {"exitCode": 42},
+  "project": {"root": "/abs/path", "rootSource": "server-config"}
+}
+```
+
 **Output (timeout)**.  
 ```json
 {
@@ -692,7 +811,9 @@ whose span contains it; starting at it counts).
   candidate is a different length, and renumbers it always.
 ```
 
-**How it works**.  Substitutes the candidate over the hole's actual span (four characters for `{!!}`, one for `?`, arbitrary for `{! e !}`), typechecks the file **in place** (restoring the original afterwards), and reports success — tolerating only the `[UnsolvedInteractionMetas]` of the file's other open holes, or of new sub-holes inside the candidate — or the type error.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` behind is reported as a type error (issue #69).  Hole *tracking* matches hole *tolerance* (issue #71): the hole address, `holes`, and `remainingHoles` cover every hole syntax, so a `?` or `{! ... !}` sub-hole introduced by the candidate is counted and addressable like any other hole.  Every response (ok, type error, or timeout) carries `holes`, the re-anchored list described under [Stable hole handles](#stable-hole-handles-issue-79), so a multi-hole edit needs no index bookkeeping between calls (issue #79).  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
+**Output (the file changed under the check)**.  An error response, with no `status`: another writer changed the file while it was being checked, and it was left as that writer left it.  Its text is a JSON object, `{error, fileChanged {file, when, expected, found?}}`, described under [Keeping a candidate](#keeping-a-candidate-apply-and-patch-issue-136).
+
+**How it works**.  Substitutes the candidate over the hole's actual span (four characters for `{!!}`, one for `?`, arbitrary for `{! e !}`), exactly as it was sent, typechecks the file **in place** (restoring the original afterwards, unless `apply` keeps an accepted candidate), and reports success (tolerating only the `[UnsolvedInteractionMetas]` of the file's other open holes, or of new sub-holes inside the candidate) or the type error.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` behind is reported as a type error (issue #69).  Hole *tracking* matches hole *tolerance* (issue #71): the hole address, `holes`, and `remainingHoles` cover every hole syntax, so a `?` or `{! ... !}` sub-hole introduced by the candidate is counted and addressable like any other hole.  Every response (ok, type error, or timeout) carries `holes`, the re-anchored list described under [Stable hole handles](#stable-hole-handles-issue-79), so a multi-hole edit needs no index bookkeeping between calls (issue #79).  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
 
 #### `check_file`
 
@@ -1576,10 +1697,15 @@ existing AgdaDojang macros without modification.
 path on disk.  `fill_hole` — and `get_goal` on its fallback path (since issue
 #108 the lane answers it without touching the file when it can) — must alter
 the source (inject the reporting macro, or substitute a candidate), so they
-patch the file transiently and restore it afterwards under `bracket_`.  The original is
+patch the file transiently and restore it afterwards.  The original is
 captured and rewritten as raw bytes (`Data.ByteString`), so the file is
-returned byte-for-byte — no encoding or newline round-trip — even if Agda
-errors or the call is interrupted.  Checking in place, rather than against a
+returned byte-for-byte, with no encoding or newline round-trip, even if Agda
+errors or the call is cancelled.  Since issue #136 each write is made only
+over bytes the server knows: the patched text over the bytes the call read,
+and the restore over the patched text it wrote; a file another writer
+changed in between is left alone and fails the call (see [Keeping a
+candidate](#keeping-a-candidate-apply-and-patch-issue-136)).  A candidate
+that `fill_hole` was asked to apply is the one text that stays.  Checking in place, rather than against a
 scratch copy, is what lets a hierarchically-named module embedded in a
 library resolve its own name and cross-directory imports the same way it does
 for the developer; an earlier scratch-copy approach failed on such modules
@@ -1601,7 +1727,7 @@ orphaned `agda` still burning CPU.  This is why `readProcessWithExitCode` could
 not simply be wrapped in `System.Timeout.timeout`: that kills the *waiting
 Haskell thread*, not the subprocess, and leaks a running `agda` every time it
 fires (issue #77).  A timeout is returned as a value, never thrown, which is what
-lets the in-place tools' `bracket_` restore run on the timeout path exactly as it
+lets the in-place tools' restore run on the timeout path exactly as it
 does after a clean typecheck.
 
 

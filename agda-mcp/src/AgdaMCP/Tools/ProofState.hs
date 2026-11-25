@@ -110,10 +110,11 @@
 --     a declaration-shaped line sitting inside a @{! … !}@ hole, which Agda
 --     lexes as one token and never parses.
 --     'ensureDebugImport' and 'moduleNameOf' therefore scan
---     'AgdaMCP.Holes.codeOnly' — the source with prose, comments, and pragmas
---     blanked, every character position preserved — so the header they find is
---     the header Agda finds, and a line index found there still splices into the
---     original text.  Scanning the raw source instead is what made get_goal
+--     'AgdaMCP.Holes.codeOnly' (the source with prose, comments, and pragmas
+--     blanked, a leading byte-order mark left out, and every line and column
+--     preserved), so the header they find is the header Agda finds, on line 1
+--     of a marked file too, and a line index found there still splices into
+--     the original text.  Scanning the raw source instead is what made get_goal
 --     report a module name read from a prose line (issue #100): the same fixture
 --     whose prose #73 already stopped fooling the import injection.
 --
@@ -129,9 +130,34 @@
 --
 --     get_goal and fill_hole must still alter the source (inject the reporting macro,
 --     or substitute a candidate), so they patch the real file transiently and restore
---     it under 'Control.Exception.bracket_'.  The original is captured and restored as
---     raw bytes ('Data.ByteString'), so the file is returned byte-for-byte even if Agda
+--     it ('runInPlace').  The original is captured and restored as raw bytes
+--     ('Data.ByteString'), so the file is returned byte-for-byte even if Agda
 --     errors or the call is interrupted; no encoding or newline round-trip is involved.
+--
+--   Design note: the file is written only over bytes the server knows (issue #136).
+--     The server is not the file's only writer: an editor beside the agent saves
+--     when its user does.  So 'runInPlace' writes the patched text only while the
+--     file still holds the bytes this call read, and restores the original only
+--     while the file still holds the patched text it wrote.  A file found
+--     changed is left as the other writer left it, and the call fails
+--     ('AgdaMCP.Types.FailFileChanged') without a verdict, since Agda may have
+--     read either text.  Until #136 the restore was unconditional, and a save
+--     made during a check was overwritten by it.  The guard narrows the time
+--     in which a save can be lost from the whole check to the instant between
+--     a comparison and the write after it (measured: tenths of a millisecond);
+--     it does not close it, and 'runInPlace' says why nothing here can.
+--
+--   Design note: fill_hole can leave a candidate in the file, or answer the
+--   edit (issue #136).
+--     By default it restores the file, as it always has, and its answer is what
+--     it was.  @apply: true@ keeps the candidate when, and only when, its status
+--     is ok and the file still holds the bytes the server wrote; the answer's
+--     @applied@ says which happened.  @patch: true@ adds the edit that was
+--     checked ('AgdaMCP.Patch.textPatch'), on every status, for a client that
+--     applies it to a text of its own: an editor changes its buffer, not the
+--     file.  The candidate is spliced as it was sent, with nothing added
+--     ('AgdaMCP.Holes.spliceSpan'), so what is checked, what is written, and
+--     what the patch says are one text.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -149,10 +175,14 @@ module AgdaMCP.Tools.ProofState
   , fillVerdictMeaning
   , goalVerdictMeaning
   , unexplainedFailureTail
+  , InPlaceEnd (..)
+  , InPlaceOps (..)
+  , runInPlace
+  , runInPlaceWith
   ) where
 
 import Control.Applicative ((<|>))
-import Control.Exception (bracket_)
+import Control.Exception (allowInterrupt, mask, onException, uninterruptibleMask_)
 import qualified Data.ByteString as BS
 import GHC.Clock (getMonotonicTimeNSec)
 import Data.List (find, findIndex)
@@ -167,11 +197,13 @@ import AgdaMCP.Agda
   )
 import AgdaMCP.Diagnostics
   ( attachUnsolvedMetas, capDiagnostics, parseDiagnostics )
+import AgdaMCP.Digest (sourceDigest)
 import AgdaMCP.Holes
   ( HoleSpan (..), LiterateFlavour, ResolvedHole (..), codeOnly, findHoles
-  , flavourOf, injectReportExpr, resolveHoleRef, substituteHole
+  , flavourOf, injectReportExpr, resolveHoleRef, spliceSpan
   )
-import AgdaMCP.Path (withSourceFile)
+import AgdaMCP.Patch (textPatch)
+import AgdaMCP.Path (readRegularFile, withSourceFile)
 import AgdaMCP.Interaction
   ( GoalContext (..), GoalCtxEntry (..), InteractionLanes, IPoint (..)
   , IRange (..), LaneEvent (..), LaneFailure (..), LaneGoal (..)
@@ -252,71 +284,80 @@ handleGetGoal lanes cfg0 params =
 injectedGoal
   :: AgdaConfig -> ProjectContext -> FilePath -> BS.ByteString -> Text -> Int
   -> IO (Either ToolFailure GoalInfo)
-injectedGoal cfg pc absPath origBytes src idx = do
-            let label = holeLabel (flavourOf absPath) src idx
-            case injectReportExpr (reportExpr cfg) (flavourOf absPath) idx
-                   (ensureDebugImport (flavourOf absPath) src) of
-              -- Unreachable in practice: 'resolveHoleRef' validated the index
-              -- against the same scan, and the injected import adds no holes.
-              Nothing -> pure . Left . FailMessage $
-                "Could not splice the reporting macro over " <> label
-                <> " in " <> T.pack absPath
-              Just patched -> do
-                result <- runInPlace cfg absPath origBytes patched
-                -- DEBUG: show what Agda actually returned
-                debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
-                  <> " timedOut=" <> T.pack (show (arTimedOut result))
-                  <> " elapsedMs=" <> T.pack (show (arElapsedMs result))
-                debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
-                debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
-                -- Agda may emit markers on stdout or stderr; check both.
-                let combined = arStdout result <> "\n" <> arStderr result
-                    verdict  = patchedVerdict result goalVerdictMeaning
-                      (label <> " replaced by '" <> reportExpr cfg <> " ?'")
-                if arTimedOut result
-                  -- A timeout is reported as such rather than as "could not parse
-                  -- markers": the markers are missing because Agda was killed, and
-                  -- saying so is what tells the caller to raise the bound.  It is a
-                  -- structured failure so the response still carries the timing,
-                  -- cache, and project metadata the call produced on the way down.
-                  then pure . Left . FailTimeout $ TimeoutFailure
-                    { tfMessage = timeoutMessage cfg <> "; no goal was reported for "
-                        <> label <> " in " <> T.pack absPath
-                    , tfElapsedMs         = arElapsedMs result
-                    , tfCheckedFromSource = checkedFromSourceOf result
-                    , tfVerdict           = verdict
-                    , tfCommand           = arCommand result
-                    , tfProject           = pc
-                    }
-                  else case parseGoalContext combined of
-                    Nothing -> pure . Left . FailMessage $
-                      "Could not parse goal/context markers from Agda output.\n"
-                      <> "ran: " <> commandLine (arCommand result) <> "\n"
-                      <> "output:\n" <> T.take 2000 combined
-                    Just (goal, ctx) ->
-                      pure . Right $ GoalInfo
-                        { giGoal    = goal
-                        , giContext = ctx
-                        -- The name Agda resolved for this file (e.g. FLRP.Bridge),
-                        -- from its own progress line in the run above; the name the
-                        -- source declares is the fallback for when Agda did not say,
-                        -- and is itself scanned off the code-only view, so neither
-                        -- answer can come from prose or a comment (issue #100).
-                        , giModule  = agdaModuleNameOf absPath result
-                                        <|> moduleNameOf (flavourOf absPath) src
-                        , giElapsedMs         = Just (arElapsedMs result)
-                        , giCheckedFromSource = checkedFromSourceOf result
-                        , giVerdict = Just verdict
-                        , giCommand = Just (arCommand result)
-                        , giProject = Just pc
-                        , giSource  = Just "injected-macro"
-                        , giLane    = Nothing
-                        , giAddressed = Nothing
-                        -- The macro prints @inferType >=> normalise@, whatever
-                        -- the call asked for, so a caller that asked for
-                        -- another mode can see that it did not get it (#248).
-                        , giRewrite = Just Normalised
-                        }
+injectedGoal cfg pc absPath origBytes src idx =
+  case injectReportExpr (reportExpr cfg) (flavourOf absPath) idx
+         (ensureDebugImport (flavourOf absPath) src) of
+    -- Unreachable in practice: 'resolveHoleRef' validated the index
+    -- against the same scan, and the injected import adds no holes.
+    Nothing -> pure . Left . FailMessage $
+      "Could not splice the reporting macro over " <> label
+      <> " in " <> T.pack absPath
+    Just patched -> do
+      -- The macro is never kept: the file is restored, unless another writer
+      -- changed it under the check, and then there is no goal to report,
+      -- because the text Agda read is not known (issue #136).
+      ran <- runInPlace cfg absPath origBytes (TE.encodeUtf8 patched) (const False)
+      case ran of
+        Left changed      -> pure (Left (FailFileChanged changed))
+        Right (result, _) -> reportFrom result
+  where
+    label = holeLabel (flavourOf absPath) src idx
+
+    reportFrom result = do
+      -- DEBUG: show what Agda actually returned
+      debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
+        <> " timedOut=" <> T.pack (show (arTimedOut result))
+        <> " elapsedMs=" <> T.pack (show (arElapsedMs result))
+      debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
+      debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
+      -- Agda may emit markers on stdout or stderr; check both.
+      let combined = arStdout result <> "\n" <> arStderr result
+          verdict  = patchedVerdict result goalVerdictMeaning
+            (label <> " replaced by '" <> reportExpr cfg <> " ?'") restoredNote
+      if arTimedOut result
+        -- A timeout is reported as such rather than as "could not parse
+        -- markers": the markers are missing because Agda was killed, and
+        -- saying so is what tells the caller to raise the bound.  It is a
+        -- structured failure so the response still carries the timing,
+        -- cache, and project metadata the call produced on the way down.
+        then pure . Left . FailTimeout $ TimeoutFailure
+          { tfMessage = timeoutMessage cfg <> "; no goal was reported for "
+              <> label <> " in " <> T.pack absPath
+          , tfElapsedMs         = arElapsedMs result
+          , tfCheckedFromSource = checkedFromSourceOf result
+          , tfVerdict           = verdict
+          , tfCommand           = arCommand result
+          , tfProject           = pc
+          }
+        else case parseGoalContext combined of
+          Nothing -> pure . Left . FailMessage $
+            "Could not parse goal/context markers from Agda output.\n"
+            <> "ran: " <> commandLine (arCommand result) <> "\n"
+            <> "output:\n" <> T.take 2000 combined
+          Just (goal, ctx) ->
+            pure . Right $ GoalInfo
+              { giGoal    = goal
+              , giContext = ctx
+              -- The name Agda resolved for this file (e.g. FLRP.Bridge),
+              -- from its own progress line in the run above; the name the
+              -- source declares is the fallback for when Agda did not say,
+              -- and is itself scanned off the code-only view, so neither
+              -- answer can come from prose or a comment (issue #100).
+              , giModule  = agdaModuleNameOf absPath result
+                              <|> moduleNameOf (flavourOf absPath) src
+              , giElapsedMs         = Just (arElapsedMs result)
+              , giCheckedFromSource = checkedFromSourceOf result
+              , giVerdict = Just verdict
+              , giCommand = Just (arCommand result)
+              , giProject = Just pc
+              , giSource  = Just "injected-macro"
+              , giLane    = Nothing
+              , giAddressed = Nothing
+              -- The macro prints @inferType >=> normalise@, whatever
+              -- the call asked for, so a caller that asked for
+              -- another mode can see that it did not get it (#248).
+              , giRewrite = Just Normalised
+              }
 
 
 -- | laneGoal: try to answer @get_goal@ from the interaction lane.
@@ -410,17 +451,25 @@ laneGoal lanes cfg pc absPath src reload rw idx = do
 -- typecheck.
 --
 -- 1. Read source, resolve the caller's 'HoleRef' (a @(line, column)@ position
---    or a @holeIndex@), substitute the candidate over that hole's span.
--- 2. Typecheck the patched file IN PLACE (restoring the original afterwards).
+--    or a @holeIndex@), substitute the candidate over that hole's span, as it
+--    was sent and with nothing added.
+-- 2. Typecheck the patched file IN PLACE.
 -- 3. Exit 0 → ok.  A non-zero exit is ok only when 'onlyOpenHoleErrors' holds,
 --    i.e. every reported error is an open hole's @[UnsolvedInteractionMetas]@;
 --    a candidate that leaves @[UnsolvedMetaVariables]@ or
 --    @[UnsolvedConstraints]@ behind is a type error (issue #69).
--- 4. Answer with the hole list of the patched source, so a client that keeps
+-- 4. Restore the file, unless the call passed @apply: true@ and the status is
+--    ok: then the candidate stays, and @applied@ says so (issue #136).  Either
+--    is done only while the file still holds the bytes written in step 2; a
+--    file another writer changed is left alone and the call fails without a
+--    verdict ('runInPlace').
+-- 5. Answer with the hole list of the patched source, so a client that keeps
 --    the candidate re-anchors on positions without a second call (issue #79).
---    Those are the holes of the file /as this candidate leaves it/; the bytes
---    on disk are restored, so until the candidate is written back the file
---    still has the holes it started with.
+--    Those are the holes of the file /as this candidate leaves it/: the file's
+--    own holes once it is applied, and until then the holes it will have when
+--    the candidate is written back.
+-- 6. With @patch: true@, add the edit that was checked, on every status: it
+--    says what was tried, and @status@ says what Agda made of it (issue #136).
 handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either ToolFailure FillResult)
 handleFillHole cfg0 params =
   withSourceFile (fhFilePath params) $ \absPath origBytes src ->
@@ -428,43 +477,49 @@ handleFillHole cfg0 params =
         case resolveHoleRef absPath (flavourOf absPath) src (fhHole params) of
           Left miss -> pure (Left (FailMessage miss))
           Right rh -> do
-            let idx   = rhIndex rh
-                label = holeLabel (flavourOf absPath) src idx
-            case substituteHole (flavourOf absPath) idx (fhCandidate params) src of
-              -- Unreachable in practice: 'resolveHoleRef' validated the index
-              -- against the same scan of the same text.
-              Nothing -> pure . Left . FailMessage $
-                "Could not splice the candidate over " <> label
-                <> " in " <> T.pack absPath
-              Just patched -> do
-                result <- runInPlace cfg absPath origBytes patched
+            let hole         = rhSpan rh
+                label        = holeLabel (flavourOf absPath) src (rhIndex rh)
+                candidate    = fhCandidate params
+                -- One splice serves the check, the apply, and the patch: the
+                -- resolved span of the text just read, replaced by the
+                -- candidate as sent.
+                patched      = spliceSpan hole candidate src
+                patchedBytes = TE.encodeUtf8 patched
                 -- Agda 2.8.0 emits some errors on stdout; check both streams.
-                let combined = arStdout result <> "\n" <> arStderr result
-                    -- Verdict (issues #69, #77).  The timeout arm comes first: a killed
-                    -- process exits on its signal (-2 SIGINT, -15 SIGTERM), which is
-                    -- otherwise indistinguishable from an ordinary failure, and calling
-                    -- an unfinished typecheck a type_error would be a false verdict.
-                    -- Below it, a non-zero exit is ok only when every reported error is
-                    -- an open hole's [UnsolvedInteractionMetas]; 'onlyOpenHoleErrors'
-                    -- explains why this is a whitelist.  An exit code of -1 means the
-                    -- agda binary could not be run at all.
-                    status
-                      | arTimedOut result           = FillTimeout
-                      | arExitCode result == 0      = FillOk
-                      | arExitCode result == (-1)   = FillCrash
-                      | onlyOpenHoleErrors combined = FillOk
-                      | otherwise                   = FillTypeError
+                combinedOf result = arStdout result <> "\n" <> arStderr result
+                -- Verdict (issues #69, #77).  The timeout arm comes first: a killed
+                -- process exits on its signal (-2 SIGINT, -15 SIGTERM), which is
+                -- otherwise indistinguishable from an ordinary failure, and calling
+                -- an unfinished typecheck a type_error would be a false verdict.
+                -- Below it, a non-zero exit is ok only when every reported error is
+                -- an open hole's [UnsolvedInteractionMetas]; 'onlyOpenHoleErrors'
+                -- explains why this is a whitelist.  An exit code of -1 means the
+                -- agda binary could not be run at all.
+                statusOf result
+                  | arTimedOut result                       = FillTimeout
+                  | arExitCode result == 0                  = FillOk
+                  | arExitCode result == (-1)               = FillCrash
+                  | onlyOpenHoleErrors (combinedOf result)  = FillOk
+                  | otherwise                               = FillTypeError
+                -- An apply keeps an accepted candidate and nothing else: a
+                -- type error, a timeout and a crash restore the file.
+                keeps result = fhApply params && statusOf result == FillOk
+            ran <- runInPlace cfg absPath origBytes patchedBytes keeps
+            case ran of
+              Left changed -> pure (Left (FailFileChanged changed))
+              Right (result, end) -> do
+                let status = statusOf result
                     msg
                       | arTimedOut result = Just (timeoutMessage cfg)
                       | status == FillOk  = Nothing
-                      | otherwise         = Just (T.take 2000 combined)
+                      | otherwise         = Just (T.take 2000 (combinedOf result))
                     -- The holes left in the patched source (every Agda hole
                     -- syntax, code regions only): the re-anchoring payload, of
                     -- which remainingHoles is the count.
                     remaining = holeInfosOf (findHoles (flavourOf absPath) patched)
                 pure . Right $ FillResult
                   { frStatus    = status
-                  , frCandidate = fhCandidate params
+                  , frCandidate = candidate
                   , frAddressed = addressedOf rh
                   , frMessage   = msg
                   , frRemainingHoles = Just (length remaining)
@@ -473,8 +528,17 @@ handleFillHole cfg0 params =
                   , frCheckedFromSource = checkedFromSourceOf result
                   , frVerdict   = patchedVerdict result fillVerdictMeaning
                       (label <> " replaced by the candidate")
+                      (case end of
+                         Restored -> restoredNote
+                         Kept     -> "the candidate was left in the file: apply")
                   , frCommand   = arCommand result
                   , frProject   = pc
+                  , frApplied   = if fhApply params then Just (end == Kept) else Nothing
+                  , frPatch     =
+                      if fhPatch params
+                        then Just (textPatch absPath origBytes src
+                                     (hsStart hole) (hsEnd hole) candidate patchedBytes)
+                        else Nothing
                   }
 
 
@@ -650,15 +714,20 @@ plainVerdict result meaning = Verdict
 -- @get_goal@ and @fill_hole@ both rewrite the source before running Agda, so
 -- naming the bare command would be a false equivalence: nobody running it
 -- themselves would reproduce the result.  The patch is named alongside the
--- command, together with the fact that the file is restored either way.
-patchedVerdict :: AgdaResult -> Text -> Text -> Verdict
-patchedVerdict result meaning patchNote = Verdict
+-- command, together with what became of the file afterwards: 'restoredNote',
+-- or, for a candidate an apply kept, that it was left there (issue #136).
+patchedVerdict :: AgdaResult -> Text -> Text -> Text -> Verdict
+patchedVerdict result meaning patchNote afterNote = Verdict
   { vEquivalentTo = commandLine (arCommand result)
       <> ", run against that file with " <> patchNote
-      <> " (the file on disk is restored afterwards, byte for byte)"
+      <> " (" <> afterNote <> ")"
   , vMeaning      = meaning
   , vExitCode     = arExitCode result
   }
+
+-- | restoredNote: what a verdict says of a file that was put back.
+restoredNote :: Text
+restoredNote = "the file on disk is restored afterwards, byte for byte"
 
 -- | batchVerdictMeaning: what @success@ means for @check_file@ and
 -- @get_diagnostics@.
@@ -705,26 +774,96 @@ goalVerdictMeaning =
 -- Internal helpers
 -- ---------------------------------------------------------------------------
 
--- | runInPlace: typecheck a transiently-patched version of a file at its real path.
+-- | What became of the file at the end of an in-place check.
+data InPlaceEnd
+  = Restored  -- ^ The original bytes were written back.
+  | Kept      -- ^ The patched bytes were left in the file (an apply).
+  deriving (Eq, Show)
+
+-- | runInPlace: typecheck a patched version of a file at its real path, and
+-- afterwards restore the original or keep the patch, writing only over bytes
+-- the server knows (issue #136).
 --
--- Writes @patched@ (as UTF-8) over @absPath@, runs Agda there on the flags
+-- Writes @patchedBytes@ over @absPath@, runs Agda there on the flags
 -- 'withProject' assembled — the caller's @-l \<lib\>@, hence the library's src root,
 -- plus whatever resolution added, plus @-i \<dir-of-file\>@ — then restores
--- @originalBytes@.  It adds no flags of its own, so what the response echoes under
--- @command@ and @project@ is exactly what ran here too.
--- Both the write and the restore go through 'Data.ByteString', and
--- the restore runs under 'bracket_', so the file is returned to its exact original
--- bytes even if Agda errors or the call is interrupted; i.e., no encoding or newline
--- round-trip is involved.  Checking at the real path (rather than a scratch copy) is
--- what lets hierarchically-named library modules resolve; see the module header and
--- issue #66.
+-- @originalBytes@, unless @keep@ says of Agda's result that the patch stays.
+-- It adds no flags of its own, so what the response echoes under
+-- @command@ and @project@ is exactly what ran here too.  Checking at the real
+-- path (rather than a scratch copy) is what lets hierarchically-named library
+-- modules resolve; see the module header and issue #66.
 --
--- The timeout path restores exactly like every other path, and by construction
--- rather than by luck: 'AgdaMCP.Agda.runAgda' reports a timeout as a /value/
--- ('arTimedOut') after it has killed and reaped the subprocess, so it returns
--- normally and 'bracket_' runs its restore action the same way it does after a
--- clean typecheck.  A timed-out @fill_hole@ therefore leaves the fixture
--- byte-identical (issue #77); the test suite pins this.
+-- The file has other writers (an editor saves when its user does), so each
+-- write is made only while the file holds what this call last knew it to hold:
+--
+--   * the patched bytes go over the file only if it still holds
+--     @originalBytes@, the bytes this call read; otherwise nothing is written,
+--     Agda is not run, and the answer is 'ChangedBeforeCheck';
+--   * the restore, and equally the decision to keep, happens only if the file
+--     still holds @patchedBytes@; otherwise the file is left as it was found
+--     and the answer is 'ChangedDuringCheck', with no result: Agda may have
+--     read the patched text or the other writer's, and nothing here can tell
+--     which.  A file that can no longer be read at all (removed, replaced by
+--     something that is not a regular file) is left alone the same way.
+--
+-- What this narrows and what it does not: a save made at any time during
+-- Agda's run, which is seconds to minutes long, is now seen and kept.  The
+-- comparison and the write that follows it are still separate system calls
+-- (a read, then a truncation and a write), so a save that lands between them
+-- is overwritten as before.  Traced on the server over 30 calls (strace,
+-- ext4, 2026-11-24), the end of the read and the truncation were 0.12 to
+-- 0.51 ms apart before the check (median 0.21) and 0.12 to 2.5 ms apart at
+-- the settlement (median 0.23), against 0.10 to 0.14 s between the two
+-- writes on that small module, the tracing included.  Nothing here can close
+-- it against a writer that takes no lock: an
+-- advisory lock binds only the writers that ask for it, and an editor does
+-- not; and replacing the file by a rename compares nothing either, changes
+-- the file's identity, and loses a save written through a descriptor an
+-- editor already holds.  Nor are two servers kept apart: one that reads the
+-- file during another's check takes the patched text for the original, and
+-- restores to it (issue #370).
+--
+-- Every write goes through 'Data.ByteString', and every path that returns
+-- ends in the settlement above: after a clean run, a timeout (which
+-- 'AgdaMCP.Agda.runAgda' reports as a /value/, 'arTimedOut', after it has
+-- killed and reaped the subprocess; issue #77), and an exception thrown at
+-- the waiting thread alike.  A call that is cancelled keeps no patch, apply
+-- or not: an exception that arrives while Agda runs settles the file as a
+-- restore; one that arrives during a file step is held until the step ends
+-- and then taken where a handler restores; and one held through a settlement
+-- that kept a candidate is taken at a last check, before the call returns,
+-- whose handler restores the file too.  Without that check it was taken as
+-- the call left 'mask', after the keep, so the call failed with the
+-- candidate in the file and no answer saying so (Copilot's second review of
+-- PR 371).  The suite cancels a call while Agda runs, while the patch is
+-- being written, and during the settlement of a restore and of an apply.
+-- What remains is the instant after that check: an exception that arrives
+-- there, or after the call has returned and before its answer is written,
+-- leaves an accepted candidate in the file and the call unanswered.  Nothing
+-- inside the call can close it; a client that gets no answer reads the file
+-- again.  In the server such an exception is SIGINT, which the runtime
+-- raises in the thread that runs every call, and the server then exits.
+-- The whole call runs under
+-- 'mask', and the two steps that touch the file (the comparison with the
+-- patch write, and the settlement) under 'uninterruptibleMask_', because
+-- 'mask' alone does not hold an exception off a file operation that blocks:
+-- GHC's @openFile@ makes an interruptible @open(2)@ under 'mask' and
+-- delivers a pending exception when that call fails or is interrupted, which
+-- it can be on a network or FUSE file system, and an exception taken inside
+-- the settlement would end it before its write (Copilot's review of PR 371).
+-- On ext4 and tmpfs that did not happen once: of 165,173 and 129,194
+-- exceptions thrown at 200,000 masked read-then-write rounds on each, none
+-- arrived inside a round (GHC 9.10.3, threaded, 2026-11-24).  So the suite
+-- holds this through 'runInPlaceWith', with a read and a write that block.
+-- The cost is that a read or a write that never returns cannot be cancelled.
+--
+-- What no handler reaches: a write that fails is not retried, its
+-- 'IOException' goes to the caller, and since a write is a truncation and
+-- then a write the file may be left short; and a process that is killed runs
+-- no handler at all, so SIGTERM or SIGKILL during a check leaves the patched
+-- text in the file, as it always has, while SIGINT, which the runtime raises
+-- as an exception, restores (measured on the server before and after issue
+-- #136; issue #370).
 --
 -- Only the file's /contents/ are restored, not its modification time: the restore write
 -- deliberately leaves a fresh mtime.  That is intentional; a newer mtime forces Agda to
@@ -732,13 +871,90 @@ goalVerdictMeaning =
 -- rule, whereas resetting mtime to the original (older) value could let Agda reuse an
 -- @.agdai@ built from the transiently-patched content (e.g. a fill_hole candidate that
 -- completed the module).  Editors that compare content, not mtime alone, will not prompt,
--- since the bytes are unchanged.
-runInPlace :: AgdaConfig -> FilePath -> BS.ByteString -> Text -> IO AgdaResult
-runInPlace cfg absPath originalBytes patched =
-  bracket_
-    (BS.writeFile absPath (TE.encodeUtf8 patched))
-    (BS.writeFile absPath originalBytes)
-    (runAgda cfg absPath)
+-- since the bytes are unchanged.  A kept patch is not written again, so the file
+-- keeps the modification time of the write Agda read, and an interface Agda
+-- wrote for it is an interface of the file as it stands.
+runInPlace
+  :: AgdaConfig
+  -> FilePath
+  -> BS.ByteString          -- ^ The file's bytes, as this call read them.
+  -> BS.ByteString          -- ^ The patched bytes to check.
+  -> (AgdaResult -> Bool)   -- ^ Keep the patched bytes after this result?
+  -> IO (Either FileChanged (AgdaResult, InPlaceEnd))
+runInPlace cfg absPath = runInPlaceWith InPlaceOps
+  { -- The same guarded read the tools start with.
+    ipoRead  = either (const Nothing) Just <$> readRegularFile "filePath" absPath
+  , ipoWrite = BS.writeFile absPath
+  , ipoCheck = runAgda cfg absPath
+  } absPath
+
+-- | What a guarded in-place check does to the world: it reads the file,
+-- replaces its bytes, and runs Agda on it.
+--
+-- 'runInPlace' passes the real three.  The suite passes ones that record the
+-- masking state they run in, and ones that block, because what
+-- 'runInPlaceWith' promises about a cancellation that arrives while the file
+-- is being read or written cannot be shown on a local file, whose reads and
+-- writes do not block.
+data InPlaceOps = InPlaceOps
+  { ipoRead  :: IO (Maybe BS.ByteString)
+    -- ^ The file's bytes now, or Nothing when it is no longer a readable
+    --   regular file.
+  , ipoWrite :: BS.ByteString -> IO ()
+    -- ^ Replace the file's bytes.
+  , ipoCheck :: IO AgdaResult
+    -- ^ Run Agda on the file.
+  }
+
+-- | runInPlaceWith: 'runInPlace' over the given operations; see there for
+-- the guard, and for why the two steps that touch the file cannot be
+-- interrupted.
+runInPlaceWith
+  :: InPlaceOps
+  -> FilePath               -- ^ The file, for the failure's text.
+  -> BS.ByteString          -- ^ The file's bytes, as this call read them.
+  -> BS.ByteString          -- ^ The patched bytes to check.
+  -> (AgdaResult -> Bool)   -- ^ Keep the patched bytes after this result?
+  -> IO (Either FileChanged (AgdaResult, InPlaceEnd))
+runInPlaceWith ops absPath originalBytes patchedBytes keep = mask $ \unmask -> do
+  -- An exception that arrives during this step is taken at 'unmask' below,
+  -- inside the handler's reach, so a patch that was written is settled.
+  written <- uninterruptibleMask_ $ do
+    found <- ipoRead ops
+    if found /= Just originalBytes
+      then pure (Left (changed ChangedBeforeCheck originalBytes found))
+      else Right () <$ ipoWrite ops patchedBytes
+  case written of
+    Left failure -> pure (Left failure)
+    Right ()     -> do
+      result  <- unmask (ipoCheck ops) `onException` settle False
+      settled <- settle (keep result)
+      -- A kept candidate is the call's to answer for, so an exception held
+      -- since the check is taken here, where its handler can still restore,
+      -- rather than as the call leaves 'mask', after the keep.
+      case settled of
+        Right Kept -> allowInterrupt `onException` settle False
+        _          -> pure ()
+      pure ((,) result <$> settled)
+  where
+    -- An exception that arrives during the settlement is held until it ends,
+    -- and is then taken after a restore (when the call leaves 'mask') or
+    -- after a keep (at the check above, which restores).
+    settle :: Bool -> IO (Either FileChanged InPlaceEnd)
+    settle keepIt = uninterruptibleMask_ $ do
+      now <- ipoRead ops
+      if now /= Just patchedBytes
+        then pure (Left (changed ChangedDuringCheck patchedBytes now))
+        else if keepIt
+          then pure (Right Kept)
+          else Right Restored <$ ipoWrite ops originalBytes
+
+    changed when expected found = FileChanged
+      { fchFile     = absPath
+      , fchWhen     = when
+      , fchExpected = sourceDigest expected
+      , fchFound    = sourceDigest <$> found
+      }
 
 
 -- | holeInfosOf: a scan's spans as the wire hole list — the one construction

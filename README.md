@@ -227,8 +227,10 @@ What comes next, in the order the evidence argues for:
    constraint in ranking thousands of in-scope lemmas; a learned
    premise-selection scorer slots into the seam the search already exposes.
 +  **The field stream** (Milestone 5): the ergonomics the field reports keep
-   asking for, such as batch verdicts, a returned patch from `fill_hole`, a
-   library registry that survives worktree churn, and a profiling tool.
+   asking for, such as batch verdicts, a library registry that survives
+   worktree churn, and a profiling tool.  The first of them to land is
+   `fill_hole`'s apply and returned patch
+   ([#136](https://github.com/formalverification/agda-native-air/issues/136)).
 +  **Local specialist models** (Milestones 2 and 4): not started.  When they
    arrive they attach to `agda-mcp` as extra tools, so the interface an agent
    sees does not change.
