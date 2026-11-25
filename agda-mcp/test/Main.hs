@@ -1020,9 +1020,12 @@ outClashAt28 = T.unlines
   , "  at : Nat"
   ]
 
--- Agda 2.9.0 (agda/agda da66a8c, the pinned toolchain since issue #234)
--- rewords two of the § 5 classes, so its output is captured beside 2.8.0's:
--- the server serves projects on either, and both must parse.
+-- Agda 2.9.0 (agda/agda da66a8c, the nightly pinned by issue #234) rewords
+-- two of the § 5 classes, so its output is captured beside 2.8.0's: the
+-- server serves projects on either, and both must parse.  The released 2.9.0
+-- (the tag v2.9.0, pinned since issue #374) prints every class Diagnostics
+-- reads byte for byte as the nightly does, captured on the same files
+-- (2026-11-24), so these captures stand for both builds.
 
 -- | Captured output, Agda 2.9.0: the UnequalTerms.agda of 'outUnequalTerms'.
 -- 2.9.0 calls a mismatch of types [UnequalTypes], keeping [UnequalTerms] for

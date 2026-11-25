@@ -729,7 +729,7 @@ backend-clean:
 # 1.4.1. agda-mcp (Haskell MCP server) — build / test / smoke / serve
 #
 # Like the agda-strux targets above, these run cabal inside the flake backend
-# shell (GHC 9.10.3 + Agda 2.9.0) via run_backend, so `make agda-mcp-test` works
+# shell (GHC 9.12.2 + Agda 2.9.0) via run_backend, so `make agda-mcp-test` works
 # from outside a Nix shell.  When already inside `nix develop .#backend` (or in
 # CI, whose outer step is `nix develop`), pass BACKEND_USE_NIX=0 to avoid nesting.
 #

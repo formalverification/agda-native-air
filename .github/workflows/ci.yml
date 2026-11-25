@@ -504,7 +504,7 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
-  # Haskell • agda-mcp build & tests (requires Nix → GHC 9.10.3 + Agda)
+  # Haskell • agda-mcp build & tests (requires Nix → GHC 9.12.2 + Agda)
   #
   # Conditional: only runs when the MCP server, the agda-dojang fixtures/macros
   # it drives, the pinned toolchain, or the launcher (scripts/run-server.sh)

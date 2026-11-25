@@ -48,7 +48,7 @@ agda-native-air/
 ├── README.md
 ├── LICENSE, LICENSE-docs, CONTRIBUTING.md
 ├── .github/                   # CI workflow, CODEOWNERS, issue and PR templates
-├── flake.nix, flake.lock      # the pinned toolchain: Agda 2.9.0, stdlib 2.3, GHC, Scala, Spark, Python
+├── flake.nix, flake.lock      # the pinned toolchain: Agda 2.9.0, stdlib 2.4.1, GHC, Scala, Spark, Python
 ├── Makefile                   # the single CLI for extract → transform → ETL → train → eval
 ├── agda-dojang/               # repo-local Agda library (reflection macros) + evaluation harness
 ├── agda-mcp/                  # the MCP server (Haskell)
@@ -269,12 +269,11 @@ make eval-proof-completion-smoke
 make help    # see what's available and working now
 ```
 
-**The toolchain** is Agda 2.9.0, not yet released (agda/agda at the `nightly`
-of 2026-10-05), with standard-library 2.3 patched to type-check under it, both
-pinned by the flake.  Until Agda 2.9.0 and a standard library for it are
-released, the toolchain is available only through `nix develop`, which needs
-Nix 2.28 or later and fetches it prebuilt from the `formalverification` Cachix
-cache.
+**The toolchain** is the released Agda 2.9.0 with the released
+standard-library 2.4.1, both pinned by the flake.  nixpkgs does not package
+Agda 2.9.0 yet, so the flake builds it from agda/agda's tag `v2.9.0`;
+`nix develop` needs Nix 2.28 or later and fetches the toolchain prebuilt from
+the `formalverification` Cachix cache.
 
 **The project site** (the pages at
 [formalverification.github.io/agda-native-air](https://formalverification.github.io/agda-native-air/),
