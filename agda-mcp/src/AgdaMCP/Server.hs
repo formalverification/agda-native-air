@@ -15,7 +15,8 @@
 -- Design note:
 --   We implement this by hand (~200 lines) rather than using the @mcp-server@
 --   Hackage library because that library requires base >= 4.20 (GHC 9.10+),
---   and the project pins GHC 9.8.2 for Agda compatibility.  This module can
+--   and the project pinned GHC 9.8.2 for Agda compatibility when this was
+--   written (the backend shell is on GHC 9.12.2 now).  This module can
 --   be replaced by @mcp-server@ once GHC versions converge.
 --
 -- M1-3 additions:

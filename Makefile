@@ -358,7 +358,8 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
 #   make ci-smoke CI_SKIP_ML=1       # skip Python (e.g., no venv yet)
 #
 # NOTE: CI now uses Nix + Cachix for the Haskell backend (same as the
-# agda-dojang-eval lane) with pinned GHC 9.8.2.  For local backend runs, two modes
+# agda-dojang-eval lane) with the GHC of `nix develop .#backend` (9.12.2).  For
+# local backend runs, two modes
 # are supported:
 #   1.  From outside Nix: `make backend-test` auto-wraps via `nix develop .#backend`
 #       (BACKEND_USE_NIX=1, the default).
