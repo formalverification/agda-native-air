@@ -35,8 +35,7 @@
 #       - Run pytest if tests are present
 #
 #    5) Haskell (agda-strux backend tests)
-#       - Set up GHC 9.8.2 + Cabal
-#       - Cache ~/.cabal/store + dist-newstyle
+#       - Nix + Cachix; GHC 9.12.2 + Cabal from nix develop .#backend
 #       - Run `make backend-test`
 #
 #    6) Agda (proof-completion smoke — conditional on agda-dojang/ changes)
@@ -605,8 +604,10 @@ jobs:
             "${{ needs.agda-mcp.result }}" \
           )
           for r in "${results[@]}"; do
-            if [ "$r" = "failure" ]; then
-              echo "A required job failed: $r"
+            # A lane that hits its timeout-minutes ends `cancelled`, having
+            # run no test, so it fails the gate as a failure does.
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "A required job did not pass: $r"
               exit 1
             fi
           done
