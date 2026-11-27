@@ -111,6 +111,13 @@ Artifacts land under `data/corpora/agda-algebras/v0.1/`.  Byte-identical output 
 +  the printed `type` agrees for 938 rows and `bodyRefs` for 943;
 +  `typeAst` agrees for 426 only, because it carries strings of Agda's internal terms that 2.9.0 prints differently (a function type's sort, `FunSort` under 2.8.0, is `PiSort`; a variable, `Var`, is `Var'`); without those strings it agrees for 900.
 
+**The library commit has not moved**.  Since [#374] the repository pins the released Agda 2.9.0 and standard-library 2.4.1, and the `agda-algebras-src` flake input stays at `4662373d`.  The flake's derivation applies one patch to it, `nix/agda-algebras-4662373d-stdlib-2.4.patch`, as follows:
+
++  `agda-algebras.agda-lib`'s `depend: standard-library-2.3`, which standard-library 2.4.1 (library name `standard-library-2.4`) does not satisfy, becomes `standard-library-2.4`;
++  five names standard-library 2.4 deprecates (`_×-dec_`, `_→-dec_`, `_⊎-dec_`, `¬∀⟶∃¬`, `¬∀⟶∃¬-smallest`) become the replacements it names, each an alias of its replacement with the same fixity: 144 textual replacements in 23 modules, the renames agda-algebras made upstream in ualib/agda-algebras PR #642.
+
+No definition is added, removed, or renamed, and no signature changes.  Under the released Agda 2.9.0 all 407 modules check, with exactly the warning positions the nightly raised (measured 2026-11-24).  The rows of this corpus remain those of the producer commit's toolchain, as above.
+
 ## Using it with agda-mcp
 
 As for v0: `gunzip -k corpus.jsonl.gz && agda-mcp --corpus corpus.jsonl [flags]` registers `search_by_name`, `search_by_type`, and `get_dependencies`; `make corpus-mcp-smoke CORPUS_VERSION=v0.1` drives them over the real JSON-RPC transport.
@@ -121,3 +128,4 @@ As for v0: `gunzip -k corpus.jsonl.gz && agda-mcp --corpus corpus.jsonl [flags]`
 [#132]: https://github.com/formalverification/agda-native-air/pull/132
 [agda-algebras]: https://github.com/ualib/agda-algebras
 [#234]: https://github.com/formalverification/agda-native-air/issues/234
+[#374]: https://github.com/formalverification/agda-native-air/issues/374

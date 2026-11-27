@@ -1825,7 +1825,7 @@ We implement a minimal MCP stdio transport (~200 lines in `AgdaMCP.Server`) rath
 than using the `mcp-server` Hackage library.  The original reason was a version
 floor — that library needs `base >= 4.20`, i.e. GHC 9.10+, and the backend then
 pinned an older GHC — and that reason has since expired: the pinned toolchain is
-GHC 9.10.3.  What keeps the hand-rolled transport is that it is small and does
+GHC 9.12.2.  What keeps the hand-rolled transport is that it is small and does
 exactly what is needed: `initialize`, `tools/list`, `tools/call`, and nothing else
 to keep in step with an upstream API.
 

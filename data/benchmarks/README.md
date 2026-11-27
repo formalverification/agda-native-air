@@ -1,7 +1,7 @@
 # Benchmark Suite — `data/benchmarks/`
 
-**Issue:** [M1-5] Curate baseline benchmark (#13)
-**Agda:** 2.8.0  **standard-library:** 2.3  (both pinned by `flake.lock`)
+**Issue**: [M1-5] Curate baseline benchmark (#13)
+**Agda**: 2.9.0  **standard-library**: 2.4.1  (both pinned by `flake.lock`)
 
 The baseline benchmark is a set of Agda proof obligations with committed gold
 solutions, used as the standard evaluation set for subsequent experiments.
@@ -113,7 +113,12 @@ Domains: algebra, group, order.
    construction to the corpus provenance commit (dataset card
    `docs/corpora/agda-algebras-v0.1.md`) and to the `agda-algebras-src` flake
    input, so the benchmark's library, the corpus's library, and the toolchain's
-   library can never drift apart silently.
+   library can never drift apart silently.  Since [#374] the flake checks this
+   commit under standard-library 2.4.1 through one patch
+   (`nix/agda-algebras-4662373d-stdlib-2.4.patch`): its `depend:` line, and
+   five deprecated standard-library names renamed to their replacements, with
+   no definition or signature changed.  All 81 golds type-check under the
+   released Agda 2.9.0.
 +  **Corpus-mined**: candidates are corpus rows with `defKind: function`, a body,
    and a *plausibly single-term* proof (length-bounded, transport-marker-free,
    which is an approximation, since the corpus records no per-row clause count;
@@ -523,3 +528,4 @@ library, which carries its own (MIT) license and is not vendored here.  See the
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#202]: https://github.com/formalverification/agda-native-air/issues/202
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
+[#374]: https://github.com/formalverification/agda-native-air/issues/374

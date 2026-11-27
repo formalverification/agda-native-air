@@ -1,0 +1,887 @@
+File: nix/agda-algebras-4662373d-stdlib-2.4.patch
+
+agda-algebras at 4662373d (the benchmark and corpus commit, issue #127),
+moved to standard-library 2.4.1 under the released Agda 2.9.0 (issue #374).
+flake.nix applies it in mkAgdaAlgebrasPkg; nothing else reads it.
+
++  agda-algebras.agda-lib: `depend: standard-library-2.3` becomes `-2.4`,
+   the library name of 2.4.1, which the old line does not match.
++  src/: five names standard-library 2.4 deprecates become the
+   replacements its WARNING_ON_USAGE pragmas name, each defined as an
+   alias of the replacement, with the same fixity:
+     _×-dec_ to _×?_, _→-dec_ to _→?_, _⊎-dec_ to _⊎?_
+       (Relation.Nullary.Decidable.Core),
+     ¬∀⟶∃¬ to ¬∀⇒∃¬, ¬∀⟶∃¬-smallest to ¬∀⇒∃¬-smallest (Data.Fin.Properties).
+   144 replacements in 23 modules: 104 uses (the 104 warnings the release
+   raised without this patch), 39 import entries, and one prose mention.
+   The same renames agda-algebras made upstream in ualib/agda-algebras
+   PR #642.
+
+Made by a token-aware replacement over a checkout of 4662373d, then
+`git diff`; the text above the first `diff` line is ignored by patch.
+
+diff --git a/agda-algebras.agda-lib b/agda-algebras.agda-lib
+index 634d692fc..6b91e93e1 100644
+--- a/agda-algebras.agda-lib
++++ b/agda-algebras.agda-lib
+@@ -1,4 +1,4 @@
+ name: agda-algebras
+-depend: standard-library-2.3
++depend: standard-library-2.4
+ include: src
+ flags: -WnoUnsupportedIndexedMatch
+diff --git a/src/Classical/Properties/Lattice.lagda.md b/src/Classical/Properties/Lattice.lagda.md
+index b5c23affd..efd87331f 100644
+--- a/src/Classical/Properties/Lattice.lagda.md
++++ b/src/Classical/Properties/Lattice.lagda.md
+@@ -40,7 +40,7 @@ open import Data.Sum.Base                          using ( _⊎_ )
+ open import Level                                  using ( Level ; _⊔_ )
+ open import Relation.Binary                        using ( Setoid )
+ open import Relation.Binary.PropositionalEquality  using ( _≡_ ; _≢_ )
+-open import Relation.Nullary.Decidable.Core        using ( Dec ; ¬? ; _×-dec_ ; _→-dec_ ; _⊎-dec_ )
++open import Relation.Nullary.Decidable.Core        using ( Dec ; ¬? ; _×?_ ; _→?_ ; _⊎?_ )
+ 
+ import Relation.Binary.Reasoning.Setoid as SetoidReasoning
+ 
+@@ -263,8 +263,8 @@ module FiniteOrder {n : ℕ} (_∧_ : Fin n → Fin n → Fin n) where
+     coatom a = (a ≢ ⊤) × (∀ b → a ≤ b → (b ≡ a) ⊎ (b ≡ ⊤))
+ 
+     atom? : (a : Fin n) → Dec (atom a)
+-    atom? a = ¬? (a ≟ ⊥) ×-dec all? (λ b → (b ≤? a) →-dec ((b ≟ ⊥) ⊎-dec (b ≟ a)))
++    atom? a = ¬? (a ≟ ⊥) ×? all? (λ b → (b ≤? a) →? ((b ≟ ⊥) ⊎? (b ≟ a)))
+ 
+     coatom? : (a : Fin n) → Dec (coatom a)
+-    coatom? a = ¬? (a ≟ ⊤) ×-dec all? (λ b → (a ≤? b) →-dec ((b ≟ a) ⊎-dec (b ≟ ⊤)))
++    coatom? a = ¬? (a ≟ ⊤) ×? all? (λ b → (a ≤? b) →? ((b ≟ a) ⊎? (b ≟ ⊤)))
+ ```
+diff --git a/src/Classical/Structures/Group/MinimalNormalDescent.lagda.md b/src/Classical/Structures/Group/MinimalNormalDescent.lagda.md
+index ca7ebd9f3..f6778bdd6 100644
+--- a/src/Classical/Structures/Group/MinimalNormalDescent.lagda.md
++++ b/src/Classical/Structures/Group/MinimalNormalDescent.lagda.md
+@@ -115,7 +115,7 @@ open import Induction.WellFounded       using  ( Acc ; acc )
+ open import Level                       using  ( Level ; _⊔_ ) renaming ( suc to lsuc )
+ open import Relation.Binary             using  ( Setoid )
+ open import Relation.Nullary            using  ( ¬_ ; Dec ; yes ; no )
+-open import Relation.Nullary.Decidable  using  ( ¬? ; _×-dec_ ; decidable-stable )
++open import Relation.Nullary.Decidable  using  ( ¬? ; _×?_ ; decidable-stable )
+ open import Relation.Unary              using  ( Pred ; _∈_ ; _⊆_ ; _∩_ )
+ 
+ open import Data.List.Membership.Propositional.Properties  using  ( ∈-allFin )
+@@ -288,7 +288,7 @@ no-go below shows cannot exist for arbitrary predicates.
+ ```agda
+   -- On a finite group a decidably presented nontrivial normal subgroup has a witness.
+   witness : (𝑵 : Normalᵈ) → Nontrivial (setᵈ 𝑵) → HasNontrivialWitness (setᵈ 𝑵)
+-  witness 𝑵 nontriv = found (any? (λ i → (enum i ∈ᵈ? 𝑵) ×-dec ¬? (enum i ≟ ε)))
++  witness 𝑵 nontriv = found (any? (λ i → (enum i ∈ᵈ? 𝑵) ×? ¬? (enum i ≟ ε)))
+     where
+     -- Found: the enumerated element is the witness.  Not found: every member of 𝑵
+     -- is ≈ ε, since its representative is, so 𝑵 was trivial after all.
+@@ -330,7 +330,7 @@ finite search over the carrier enumeration.
+ 
+   Step? : (𝑴 : Normalᵈ)(i : Fin card) → Dec (Step 𝑴 i)
+   Step? 𝑴 i =  (enum i ∈ᵈ? 𝑴)
+-               ×-dec (¬? (enum i ≟ ε) ×-dec (∥ ⟪ enum i ⟫ᵈ ∥ <? ∥ 𝑴 ∥))
++               ×? (¬? (enum i ≟ ε) ×? (∥ ⟪ enum i ⟫ᵈ ∥ <? ∥ 𝑴 ∥))
+ ```
+ 
+ When the search fails, the current subgroup is minimal.  A competitor `N`{.AgdaBound}
+diff --git a/src/Classical/Structures/Group/PowerCollapse.lagda.md b/src/Classical/Structures/Group/PowerCollapse.lagda.md
+index d9824e8b5..ee0217515 100644
+--- a/src/Classical/Structures/Group/PowerCollapse.lagda.md
++++ b/src/Classical/Structures/Group/PowerCollapse.lagda.md
+@@ -80,7 +80,7 @@ open import Data.Fin.Base                          using  ( Fin ; toℕ ; Fin′
+ open import Data.Fin.Properties                    using  ( any? ; toℕ-injective
+                                                           ; toℕ-inject ; all?
+                                                           ; toℕ-fromℕ< ; toℕ<n
+-                                                          ; ¬∀⟶∃¬ ; ¬∀⟶∃¬-smallest )
++                                                          ; ¬∀⇒∃¬ ; ¬∀⇒∃¬-smallest )
+                                                    renaming ( _≟_ to _≟f_ )
+ open import Data.List.Base                         using  ( List ; [] ; _∷_
+                                                           ; filter ; allFin )
+@@ -109,7 +109,7 @@ open import Relation.Binary.PropositionalEquality  using  ( _≡_ ; refl ; cong
+ open import Relation.Nullary                       using  ( ¬_ ; Dec ; yes ; no ; ¬?
+                                                           ; decidable-stable )
+ open import Relation.Nullary.Decidable             using  ( dec-true ; dec-false
+-                                                          ; does ; map′ ; _→-dec_ )
++                                                          ; does ; map′ ; _→?_ )
+ open import Relation.Unary                         using  ( Pred ; _∈_ ; _⊆_ )
+ 
+ import Algebra.Properties.Group as GroupProperties
+@@ -271,7 +271,7 @@ respects the pointwise equality.
+   -- The joint kernel is decidable, by enumerating the power.
+   ~-dec : ∀ {i j} → Dec (i ~ j)
+   ~-dec {i} {j} = map′ toSem fromSem
+-    (all? (λ ν → U-dec (enumᴾ ν) →-dec (enumᴾ ν i ≟ enumᴾ ν j)))
++    (all? (λ ν → U-dec (enumᴾ ν) →? (enumᴾ ν i ≟ enumᴾ ν j)))
+     where
+     toSem : (∀ ν → enumᴾ ν ∈ U → enumᴾ ν i ≈ enumᴾ ν j) → i ~ j
+     toSem h u u∈U =
+@@ -297,7 +297,7 @@ together with its minimality certificate.
+   minRepΣ i = r , decidable-stable ~-dec r~~i , least
+     where
+     search : ∃[ r ∈ Fin n ] ¬ ¬ r ~ i × ((l : Fin′ r) → ¬ inject l ~ i)
+-    search = ¬∀⟶∃¬-smallest n (λ k → ¬ k ~ i) (λ k → ¬? ~-dec)
++    search = ¬∀⇒∃¬-smallest n (λ k → ¬ k ~ i) (λ k → ¬? ~-dec)
+                λ all¬ → all¬ i ~-refl
+ 
+     r : Fin n
+@@ -505,8 +505,8 @@ at `i`.
+                        (surᴾ u .proj₂ j))
+     open Setoid 𝔻[ 𝑺 ] using () renaming (_≈_ to _≈ˢ_)
+     found : ∃[ w ∈ Fin Nᴾ ] ¬ (enumᴾ w ∈ U → enumᴾ w i ≈ˢ enumᴾ w j)
+-    found = ¬∀⟶∃¬ Nᴾ  (λ ν → enumᴾ ν ∈ U → enumᴾ ν i ≈ enumᴾ ν j)
+-                      (λ ν → U-dec (enumᴾ ν) →-dec (enumᴾ ν i ≟ enumᴾ ν j)) ¬all
++    found = ¬∀⇒∃¬ Nᴾ  (λ ν → enumᴾ ν ∈ U → enumᴾ ν i ≈ enumᴾ ν j)
++                      (λ ν → U-dec (enumᴾ ν) →? (enumᴾ ν i ≟ enumᴾ ν j)) ¬all
+ 
+     u₀ : 𝕌[ Π𝑮 ]
+     u₀ = enumᴾ (found .proj₁)
+@@ -590,7 +590,7 @@ one, and the finite search finds it.
+     ¬all h = d≉ε (center-trivial (≈-dec→Stable-≈ε _≟_) nas d (central h))
+ 
+     found : ∃[ i ∈ Fin card ] ¬ Commutes d (enum i)
+-    found = ¬∀⟶∃¬ card  (λ ν → Commutes d (enum ν))
++    found = ¬∀⇒∃¬ card  (λ ν → Commutes d (enum ν))
+                         (λ ν → (d ∙ enum ν) ≟ (enum ν ∙ d)) ¬all
+ ```
+ 
+diff --git a/src/Classical/Structures/Group/SubgroupClassification.lagda.md b/src/Classical/Structures/Group/SubgroupClassification.lagda.md
+index 70c4c1b02..d2251b685 100644
+--- a/src/Classical/Structures/Group/SubgroupClassification.lagda.md
++++ b/src/Classical/Structures/Group/SubgroupClassification.lagda.md
+@@ -59,7 +59,7 @@ open import Agda.Primitive using () renaming ( Set to Type )
+ -- Imports from the Agda Standard Library ---------------------------------------
+ open import Data.Empty                             using  ( ⊥-elim )
+ open import Data.Fin.Base                          using  ( Fin )
+-open import Data.Fin.Properties                    using  ( ¬∀⟶∃¬ )
++open import Data.Fin.Properties                    using  ( ¬∀⇒∃¬ )
+                                                    renaming ( all? to allᶠ? ; _≟_ to _≟ᶠ_ )
+ open import Data.List.Base                         using  ( List ; [] ; _∷_ )
+ open import Data.List.Membership.Propositional     using  () renaming ( _∈_ to _∈ˡ_ )
+@@ -80,7 +80,7 @@ open import Level                                  using  ( Level ; _⊔_ )
+ open import Relation.Binary                        using  ( Setoid )
+ open import Relation.Binary.PropositionalEquality  using  ( refl ; sym ; subst )
+ open import Relation.Nullary                       using  ( ¬_ ; Dec ; yes ; no )
+-open import Relation.Nullary.Decidable.Core        using  ( ¬? ; _×-dec_ ; _→-dec_ )
++open import Relation.Nullary.Decidable.Core        using  ( ¬? ; _×?_ ; _→?_ )
+ open import Relation.Unary                         using  ( Pred ; _∈_ ; _⊆_ )
+ 
+ -- Imports from the Agda Universal Algebra Library ------------------------------
+@@ -130,7 +130,7 @@ indices.
+     Table⊆ K L = ∀ i → enum i ∈ set K → enum i ∈ set L
+ 
+     table⊆? : (K L : DecSubgroup 𝒢 ℓ) → Dec (Table⊆ K L)
+-    table⊆? K L = allᶠ? (λ i → memb? K (enum i) →-dec memb? L (enum i))
++    table⊆? K L = allᶠ? (λ i → memb? K (enum i) →? memb? L (enum i))
+ 
+     table→⊆ : (K L : DecSubgroup 𝒢 ℓ) → Table⊆ K L → set K ⊆ set L
+     table→⊆ K L tbl {x} x∈K with enum-sur x
+@@ -156,7 +156,7 @@ indices.
+     ¬→-split (no ¬p) ¬imp  = ⊥-elim (¬imp (λ p → ⊥-elim (¬p p)))
+ 
+     unpack : Σ[ i ∈ Fin card ] (enum i ∈ set K × ¬ (enum i ∈ set L))
+-    unpack with ¬∀⟶∃¬ _ _ (λ i → memb? K (enum i) →-dec memb? L (enum i)) ¬tbl
++    unpack with ¬∀⇒∃¬ _ _ (λ i → memb? K (enum i) →? memb? L (enum i)) ¬tbl
+     ... | i , ¬impᵢ = i , ¬→-split (memb? K (enum i)) ¬impᵢ
+ ```
+ 
+@@ -257,23 +257,23 @@ decision *is* the re-verification of every emitted word.
+       expOK? : ∀ k → Dec (ExpOK k)
+       expOK? k =
+         allˡ? (λ l → memb? (sub k) (enum l)) (gens k)
+-        ×-dec allᶠ? (λ i → memb? (sub k) (enum i) →-dec
++        ×? allᶠ? (λ i → memb? (sub k) (enum i) →?
+                 (allˡ? (_∈ˡ? gens k) (expWords k i)
+-                 ×-dec (evalWord (expWords k i) ≈? enum i)))
++                 ×? (evalWord (expWords k i) ≈? enum i)))
+ 
+       stepOK? : ∀ k j → Dec (StepOK k j)
+       stepOK? k j =
+-        memb? top (enum j) →-dec (¬? (memb? (sub k) (enum j)) →-dec
++        memb? top (enum j) →? (¬? (memb? (sub k) (enum j)) →?
+           (  (rank k <? rank (stepNext k j))
+-           ×-dec PointwiseProps.decidable
+-                   (λ l w → allˡ? (_∈ˡ? (j ∷ gens k)) w ×-dec (evalWord w ≈? enum l))
++           ×? PointwiseProps.decidable
++                   (λ l w → allˡ? (_∈ˡ? (j ∷ gens k)) w ×? (evalWord w ≈? enum l))
+                    (gens (stepNext k j)) (stepWords k j)))
+ 
+     escalationOK? : Dec EscalationOK
+     escalationOK? =
+             allᶠ? expOK?
+-      ×-dec allᶠ? (λ k → allᶠ? (stepOK? k))
+-      ×-dec allᶠ? (λ k → rank k <? m)
++      ×? allᶠ? (λ k → allᶠ? (stepOK? k))
++      ×? allᶠ? (λ k → rank k <? m)
+ ```
+ 
+ #### The classifier
+diff --git a/src/Classical/Structures/Group/TableGroup.lagda.md b/src/Classical/Structures/Group/TableGroup.lagda.md
+index 1ddd327f9..cdedd783e 100644
+--- a/src/Classical/Structures/Group/TableGroup.lagda.md
++++ b/src/Classical/Structures/Group/TableGroup.lagda.md
+@@ -62,7 +62,7 @@ open import Relation.Binary.Definitions            using ( _Respects_ )
+ open import Relation.Binary.PropositionalEquality  using ( _≡_ ; refl ; sym ; trans
+                                                          ; cong ; subst )
+ open import Relation.Nullary                       using ( Dec )
+-open import Relation.Nullary.Decidable.Core        using ( _→-dec_ )
++open import Relation.Nullary.Decidable.Core        using ( _→?_ )
+ open import Relation.Unary                         using ( Pred )
+ 
+ -- Imports from the Agda Universal Algebra Library ------------------------------
+@@ -106,7 +106,7 @@ module TableGroupBuilder
+ 
+   -- Faithfulness of the action, as a decidable statement.
+   elt-inj? : Dec (∀ i j → elt i ≡ elt j → i ≡ j)
+-  elt-inj? = allᶠ? (λ i → allᶠ? (λ j → ≡-dec _≟ᶠ_ (elt i) (elt j) →-dec (i ≟ᶠ j)))
++  elt-inj? = allᶠ? (λ i → allᶠ? (λ j → ≡-dec _≟ᶠ_ (elt i) (elt j) →? (i ≟ᶠ j)))
+ 
+   -- The table computes composition, as a decidable statement.
+   mul-hom? : Dec (∀ i j → elt (mul i j) ≡ elt i ⨁ elt j)
+@@ -165,13 +165,13 @@ membership test is one vector lookup.
+ 
+       chi-∙? : Dec (∀ i j → chiPred i → chiPred j → chiPred (mul i j))
+       chi-∙? = allᶠ? (λ i → allᶠ? (λ j →
+-        T? (lookup chi i) →-dec (T? (lookup chi j) →-dec T? (lookup chi (mul i j)))))
++        T? (lookup chi i) →? (T? (lookup chi j) →? T? (lookup chi (mul i j)))))
+ 
+       chi-ε? : Dec (chiPred e)
+       chi-ε? = T? (lookup chi e)
+ 
+       chi-⁻¹? : Dec (∀ i → chiPred i → chiPred (inv i))
+-      chi-⁻¹? = allᶠ? (λ i → T? (lookup chi i) →-dec T? (lookup chi (inv i)))
++      chi-⁻¹? = allᶠ? (λ i → T? (lookup chi i) →? T? (lookup chi (inv i)))
+ 
+       -- The subgroup *structure* is kept opaque, and this is load-bearing.
+       -- It mentions the group bundle, whose law proofs are decision sweeps
+diff --git a/src/Classical/Structures/Lattice/Partitions.lagda.md b/src/Classical/Structures/Lattice/Partitions.lagda.md
+index e223575e5..d9a2fb5a3 100644
+--- a/src/Classical/Structures/Lattice/Partitions.lagda.md
++++ b/src/Classical/Structures/Lattice/Partitions.lagda.md
+@@ -86,7 +86,7 @@ open import Relation.Binary.Lattice  using ( Supremum ; Infimum )
+ open import Relation.Binary.PropositionalEquality
+                                  using ( _≡_ ; refl ; sym ; trans ; cong )
+ open import Relation.Nullary     using ( ¬_ ; Dec ; yes ; no )
+-open import Relation.Nullary.Decidable  using ( does ; _×-dec_ ; dec-true )
++open import Relation.Nullary.Decidable  using ( does ; _×?_ ; dec-true )
+ 
+ import Algebra.Lattice.Bundles                       as AlgLatticeBundles
+ import Algebra.Lattice.Properties.Lattice            as AlgLatticeProperties
+@@ -227,7 +227,7 @@ module MeetOf (pu pw : ParentVec n) where
+     P i j = SameBlock pu j i × SameBlock pw j i
+ 
+     P? : (i j : Fin n) → Dec (P i j)
+-    P? i j = (parent pu j ≟ parent pu i) ×-dec (parent pw j ≟ parent pw i)
++    P? i j = (parent pu j ≟ parent pu i) ×? (parent pw j ≟ parent pw i)
+ 
+     -- The search cannot fail: i itself is in the intersection block of i.
+     found : (i : Fin n) → Σ[ j ∈ Fin n ] (P i j × ((k : Fin n) → P i k → j ≤ k))
+diff --git a/src/Examples/Classical/Lattices/L3Heyting.lagda.md b/src/Examples/Classical/Lattices/L3Heyting.lagda.md
+index 73f195abd..9bc443c21 100644
+--- a/src/Examples/Classical/Lattices/L3Heyting.lagda.md
++++ b/src/Examples/Classical/Lattices/L3Heyting.lagda.md
+@@ -42,7 +42,7 @@ open import Data.Fin.Properties                     using ( _≟_ ; all? )
+ open import Data.Product                            using ( _×_ )
+ open import Data.Vec.Base                           using ( _∷_ ; [] )
+ open import Relation.Binary.PropositionalEquality   using ( _≡_ ; refl )
+-open import Relation.Nullary.Decidable.Core         using ( Dec ; _×-dec_ ; _→-dec_ )
++open import Relation.Nullary.Decidable.Core         using ( Dec ; _×?_ ; _→?_ )
+ 
+ -- Imports from the Agda Universal Algebra Library -----------------------------
+ open import Overture.Cayley                                 using ( Table ; ⟦_⟧ ; from-yes )
+@@ -133,7 +133,7 @@ residuation? =
+   all? (λ a →
+     all? (λ b →
+       all? (λ c →
+-        (a ∧ b ≤? c →-dec a ≤? (b ⇒ c)) ×-dec (a ≤? (b ⇒ c) →-dec a ∧ b ≤? c))))
++        (a ∧ b ≤? c →? a ≤? (b ⇒ c)) ×? (a ≤? (b ⇒ c) →? a ∧ b ≤? c))))
+ 
+ residuation : ∀ a b c → ((a ∧ b) ≤ c → a ≤ (b ⇒ c)) × (a ≤ (b ⇒ c) → (a ∧ b) ≤ c)
+ residuation = from-yes residuation?
+diff --git a/src/Examples/Classical/Lattices/L7.lagda.md b/src/Examples/Classical/Lattices/L7.lagda.md
+index fe007acf1..2abd82d79 100644
+--- a/src/Examples/Classical/Lattices/L7.lagda.md
++++ b/src/Examples/Classical/Lattices/L7.lagda.md
+@@ -56,7 +56,7 @@ open import Data.Fin.Patterns                       using ( 0F ; 1F ; 2F ; 3F ;
+ open import Data.Fin.Properties                     using ( _≟_ ; all? )
+ open import Data.Vec.Base                           using ( _∷_ ; [] )
+ open import Relation.Binary.PropositionalEquality   using ( _≡_ ; _≢_ ; refl )
+-open import Relation.Nullary.Decidable.Core         using ( _→-dec_ )
++open import Relation.Nullary.Decidable.Core         using ( _→?_ )
+ 
+ -- Imports from the Agda Universal Algebra Library -----------------------------
+ open import Overture.Cayley                     using ( Table ; ⟦_⟧ ; from-yes )
+@@ -175,7 +175,7 @@ x-coatom-l7 : coatom 3F
+ x-coatom-l7 = from-yes (coatom? 3F)
+ 
+ unique-atom-coatom-l7 : ∀ a → atom a → coatom a → a ≡ 3F
+-unique-atom-coatom-l7 = from-yes (all? (λ a → (atom? a) →-dec ((coatom? a) →-dec (a ≟ 3F))))
++unique-atom-coatom-l7 = from-yes (all? (λ a → (atom? a) →? ((coatom? a) →? (a ≟ 3F))))
+ ```
+ 
+ #### Acceptance checks {#acceptance}
+diff --git a/src/FLRP/Certificates/FilterIdeal/L16SubA5.lagda.md b/src/FLRP/Certificates/FilterIdeal/L16SubA5.lagda.md
+index 2d9c57b42..e2de2fd9d 100644
+--- a/src/FLRP/Certificates/FilterIdeal/L16SubA5.lagda.md
++++ b/src/FLRP/Certificates/FilterIdeal/L16SubA5.lagda.md
+@@ -101,7 +101,7 @@ open import Data.Product          using ( _×_ )
+ open import Data.Vec.Base         using ( Vec ; lookup ; _∷_ ; [] )
+ open import Level                 using ( 0ℓ )
+ open import Relation.Binary.PropositionalEquality  using ( _≡_ )
+-open import Relation.Nullary.Decidable.Core        using ( _×-dec_ ; _→-dec_ )
++open import Relation.Nullary.Decidable.Core        using ( _×?_ ; _→?_ )
+ open import Relation.Unary                         using ( _⊆_ )
+ 
+ -- Imports from the Agda Universal Algebra Library ------------------------------
+@@ -338,8 +338,8 @@ private
+       →          ((C.set (S k) ⊆ C.set (S l)) → ⟦ ∧-table ⟧ k l ≡ k)
+       ×          ((⟦ ∧-table ⟧ k l ≡ k) → (C.set (S k) ⊆ C.set (S l)))
+     ord-table = from-yes (allᶠ? (λ k → allᶠ? (λ l →
+-          (C.sub⊆-dec (S k) (S l) →-dec (⟦ ∧-table ⟧ k l ≟ᶠ k))
+-      ×-dec ((⟦ ∧-table ⟧ k l ≟ᶠ k) →-dec C.sub⊆-dec (S k) (S l)))))
++          (C.sub⊆-dec (S k) (S l) →? (⟦ ∧-table ⟧ k l ≟ᶠ k))
++      ×? ((⟦ ∧-table ⟧ k l ≟ᶠ k) →? C.sub⊆-dec (S k) (S l)))))
+ ```
+ 
+ 
+diff --git a/src/FLRP/Closure/OrdinalSum.lagda.md b/src/FLRP/Closure/OrdinalSum.lagda.md
+index 5cbf90422..c9b9c8bcb 100644
+--- a/src/FLRP/Closure/OrdinalSum.lagda.md
++++ b/src/FLRP/Closure/OrdinalSum.lagda.md
+@@ -99,7 +99,7 @@ open import Level                                  using  ( 0ℓ ; lift ; lower
+ open import Relation.Binary                        using  ( Setoid ; IsEquivalence )
+ open import Relation.Binary.PropositionalEquality  using  ( _≡_ ; refl ; cong ; trans ; sym )
+ open import Relation.Nullary                       using  ( ¬_ ; Dec ; yes ; no )
+-open import Relation.Nullary.Decidable             using  ( _×-dec_ ; map′ )
++open import Relation.Nullary.Decidable             using  ( _×?_ ; map′ )
+ 
+ -- Imports from the Agda Universal Algebra Library ------------------------------
+ open import Classical.Properties.Lattice             using  ( module Lattice-Order
+@@ -549,7 +549,7 @@ note in [Classical.Structures.Lattice.OrdinalSum][].
+ 
+     dec : ∀ x y → Dec (rel x y)
+     dec x y = map′ (λ (l , r) → l ,ˡ r) (λ p → lowerˡ p , lowerʳ p)
+-      ((dec₁ (retractˡ x) (retractˡ y)) ×-dec (𝑭₂ ._≟_ (retractʳ x) (retractʳ y)))
++      ((dec₁ (retractˡ x) (retractˡ y)) ×? (𝑭₂ ._≟_ (retractʳ x) (retractʳ y)))
+ 
+   -- The upper extension's relation — the pullback of `ConRel d₂` along the right
+   -- retraction — again as a record indexed by its endpoints, for the same reason
+diff --git a/src/FLRP/Closure/Product.lagda.md b/src/FLRP/Closure/Product.lagda.md
+index 7dfdd4f18..d46bce6cc 100644
+--- a/src/FLRP/Closure/Product.lagda.md
++++ b/src/FLRP/Closure/Product.lagda.md
+@@ -85,7 +85,7 @@ open import Level                                  using  ( 0ℓ )
+ open import Relation.Binary                        using  ( Setoid ; IsEquivalence )
+ open import Relation.Binary.PropositionalEquality  using  ( _≡_ ; cong ; trans )
+ open import Relation.Nullary                       using  ( Dec )
+-open import Relation.Nullary.Decidable             using  ( _×-dec_ )
++open import Relation.Nullary.Decidable             using  ( _×?_ )
+ 
+ -- Imports from the Agda Universal Algebra Library ------------------------------
+ open import Classical.Small.Structures.Lattice    using  ( Lattice )
+@@ -214,7 +214,7 @@ decidable equality componentwise.
+       ≡→≈ₓ (cong (λ z → enum₁ (proj₁ z) , enum₂ (proj₂ z)) (remQuot-combine i j))
+ 
+   𝑪-FiniteAlgebra : FiniteAlgebra 𝑪
+-  𝑪-FiniteAlgebra ._≟_ p q = 𝑭₁ ._≟_ (proj₁ p) (proj₁ q) ×-dec 𝑭₂ ._≟_ (proj₂ p) (proj₂ q)
++  𝑪-FiniteAlgebra ._≟_ p q = 𝑭₁ ._≟_ (proj₁ p) (proj₁ q) ×? 𝑭₂ ._≟_ (proj₂ p) (proj₂ q)
+   𝑪-FiniteAlgebra .card = m * n
+   𝑪-FiniteAlgebra .enum = enumC
+   𝑪-FiniteAlgebra .enum-sur = sur
+@@ -371,7 +371,7 @@ the restriction's frame.
+     cmp (inj₂ (inj₂ (inj₂ j))) uv = proj₁ (uv 0F) , reflexive θcon₂ refl₂
+ 
+     dec : ∀ p q → Dec (rel p q)
+-    dec (p₁ , p₂) (q₁ , q₂) = θdec₁ p₁ q₁ ×-dec θdec₂ p₂ q₂
++    dec (p₁ , p₂) (q₁ , q₂) = θdec₁ p₁ q₁ ×? θdec₂ p₂ q₂
+ ```
+ 
+ #### Every congruence of the composite splits
+diff --git a/src/FLRP/KurzweilNetter/Interval.lagda.md b/src/FLRP/KurzweilNetter/Interval.lagda.md
+index 58af799b3..edee7cfbb 100644
+--- a/src/FLRP/KurzweilNetter/Interval.lagda.md
++++ b/src/FLRP/KurzweilNetter/Interval.lagda.md
+@@ -81,7 +81,7 @@ open import Relation.Binary                        using  ( Setoid )
+ open import Relation.Binary.Definitions            using  ( _Respects_ )
+ open import Relation.Binary.PropositionalEquality  using  (sym)
+ open import Relation.Nullary                       using  ( ¬_ ; Dec ; yes ; no )
+-open import Relation.Nullary.Decidable             using ( map′ ; _→-dec_ )
++open import Relation.Nullary.Decidable             using ( map′ ; _→?_ )
+ open import Relation.Unary                         using ( Pred ; _∈_ ; _⊆_ )
+ 
+ -- Imports from the Agda Universal Algebra Library ------------------------------
+@@ -143,7 +143,7 @@ the decidable interval isomorphism both consume this decider.
+     K-dec pv x =
+       map′ (λ f {i} {j} → f i j) (λ g i j → g)
+         (all? (λ i → all? (λ j →
+-          (parent pv i ≟ parent pv j) →-dec FiniteAlgebra._≟_ 𝑭ₛ (x i) (x j))))
++          (parent pv i ≟ parent pv j) →? FiniteAlgebra._≟_ 𝑭ₛ (x i) (x j))))
+ ```
+ 
+ **Entry 4 of the assumptions registry** ([FLRP.Assumptions][]): every interval
+diff --git a/src/FLRP/L7EqSix.lagda.md b/src/FLRP/L7EqSix.lagda.md
+index 75a59cf25..96de55394 100644
+--- a/src/FLRP/L7EqSix.lagda.md
++++ b/src/FLRP/L7EqSix.lagda.md
+@@ -68,7 +68,7 @@ open import Data.Sum.Base                          using ( _⊎_ ; inj₁ ; inj
+ open import Data.Vec.Base                          using ( _∷_ ; [] )
+ open import Data.Vec.Properties                    using ( ≡-dec )
+ open import Relation.Binary.PropositionalEquality  using ( _≡_ ; refl ; sym ; trans ; subst )
+-open import Relation.Nullary.Decidable.Core        using ( Dec ; _×-dec_ ; _⊎-dec_ ; _→-dec_ )
++open import Relation.Nullary.Decidable.Core        using ( Dec ; _×?_ ; _⊎?_ ; _→?_ )
+ 
+ -- Imports from the Agda Universal Algebra Library -----------------------------
+ open import Overture.Cayley                        using ( from-yes )
+@@ -114,7 +114,7 @@ over the finite carrier.
+ 
+ -- The assignment is injective: distinct L7 elements get distinct partitions.
+ θ-injective : ∀ k l → θ k ≡ θ l → k ≡ l
+-θ-injective = from-yes (all? λ k → all? λ l → ≡-dec _≟_ (θ k) (θ l) →-dec (k ≟ l))
++θ-injective = from-yes (all? λ k → all? λ l → ≡-dec _≟_ (θ k) (θ l) →? (k ≟ l))
+ ```
+ 
+ #### The induced equivalence relations
+@@ -155,12 +155,12 @@ intersection of the relations of `k` and `l`, in both directions, decided over a
+ -- The relation of a meet refines both arguments' relations.
+ meet-⊆ : ∀ k l x y → x ∼[ k ∧ l ] y → (x ∼[ k ] y) × (x ∼[ l ] y)
+ meet-⊆ = from-yes (all? λ k → all? λ l → all? λ x → all? λ y →
+-           ∼-dec (k ∧ l) x y →-dec (∼-dec k x y ×-dec ∼-dec l x y))
++           ∼-dec (k ∧ l) x y →? (∼-dec k x y ×? ∼-dec l x y))
+ 
+ -- Conversely, a pair related by both arguments is related by the meet.
+ meet-⊇ : ∀ k l x y → (x ∼[ k ] y) × (x ∼[ l ] y) → x ∼[ k ∧ l ] y
+ meet-⊇ = from-yes (all? λ k → all? λ l → all? λ x → all? λ y →
+-           (∼-dec k x y ×-dec ∼-dec l x y) →-dec ∼-dec (k ∧ l) x y)
++           (∼-dec k x y ×? ∼-dec l x y) →? ∼-dec (k ∧ l) x y)
+ ```
+ 
+ #### Joins are least upper bounds
+@@ -173,7 +173,7 @@ is a decided containment, exactly like the meets.
+ -- The relation of a join contains both arguments' relations.
+ join-⊇ : ∀ k l x y → (x ∼[ k ] y) ⊎ (x ∼[ l ] y) → x ∼[ k ∨ l ] y
+ join-⊇ = from-yes (all? λ k → all? λ l → all? λ x → all? λ y →
+-           (∼-dec k x y ⊎-dec ∼-dec l x y) →-dec ∼-dec (k ∨ l) x y)
++           (∼-dec k x y ⊎? ∼-dec l x y) →? ∼-dec (k ∨ l) x y)
+ ```
+ 
+ Least-ness quantifies over *arbitrary* equivalence relations, so it cannot be a
+@@ -190,7 +190,7 @@ Step : Fin 7 → Fin 7 → Fin 6 → Fin 6 → Type
+ Step k l x z = (x ∼[ k ] z) ⊎ (x ∼[ l ] z)
+ 
+ step-dec : ∀ k l x z → Dec (Step k l x z)
+-step-dec k l x z = ∼-dec k x z ⊎-dec ∼-dec l x z
++step-dec k l x z = ∼-dec k x z ⊎? ∼-dec l x z
+ 
+ -- Chains of at most m alternating hops from x to y.
+ Chain : Fin 7 → Fin 7 → ℕ → Fin 6 → Fin 6 → Type
+@@ -200,7 +200,7 @@ Chain k l (suc m) x y = (x ≡ y) ⊎ (Σ[ z ∈ Fin 6 ] (Step k l x z × Chain
+ chain-dec : ∀ k l m x y → Dec (Chain k l m x y)
+ chain-dec k l zero    x y = x ≟ y
+ chain-dec k l (suc m) x y =
+-  (x ≟ y) ⊎-dec any? (λ z → step-dec k l x z ×-dec chain-dec k l m z y)
++  (x ≟ y) ⊎? any? (λ z → step-dec k l x z ×? chain-dec k l m z y)
+ ```
+ 
+ A chain is sound for any equivalence relation `T` containing the two argument
+diff --git a/src/FLRP/Representable.lagda.md b/src/FLRP/Representable.lagda.md
+index df0139aca..bf5fb95af 100644
+--- a/src/FLRP/Representable.lagda.md
++++ b/src/FLRP/Representable.lagda.md
+@@ -48,7 +48,7 @@ open import Agda.Primitive       using () renaming ( Set to Type )
+ open import Data.Empty           using ( ⊥-elim )
+ open import Data.Fin.Base        using ( Fin )
+ open import Data.Fin.Patterns    using ( 0F ; 1F )
+-open import Data.Fin.Properties  using ( ¬Fin0 ; all? ; ¬∀⟶∃¬ ) renaming ( _≟_ to _≟ᶠ_ )
++open import Data.Fin.Properties  using ( ¬Fin0 ; all? ; ¬∀⇒∃¬ ) renaming ( _≟_ to _≟ᶠ_ )
+ open import Data.Nat.Base        using ( zero ; suc )
+ open import Data.Product         using ( _,_ ; _×_ ; proj₁ ; proj₂ ; Σ-syntax )
+ open import Data.Sum.Base        using ( _⊎_ ; inj₁ ; inj₂ )
+@@ -60,7 +60,7 @@ open import Relation.Binary.PropositionalEquality
+                                  using ( _≡_ ; refl ; sym ; subst )
+ open import Relation.Nullary     using ( ¬_ ; Dec ; yes ; no )
+ open import Relation.Nullary.Decidable
+-                                 using ( _→-dec_ )
++                                 using ( _→?_ )
+ 
+ -- Imports from the Agda Universal Algebra Library ------------------------------
+ open import Classical.Properties.Lattice         using  ( module Lattice-Order
+@@ -534,7 +534,7 @@ module _ {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρ} (𝑭
+ 
+     table? : (d e : DecCon 𝑨 ℓ) → Dec (Table d e)
+     table? d e = all? (λ i → all? (λ j →
+-      proj₂ d (𝑭 .enum i) (𝑭 .enum j) →-dec proj₂ e (𝑭 .enum i) (𝑭 .enum j)))
++      proj₂ d (𝑭 .enum i) (𝑭 .enum j) →? proj₂ e (𝑭 .enum i) (𝑭 .enum j)))
+ 
+     -- Lift a full table to the containment, through surjectivity.
+     table→⊆ : (d e : DecCon 𝑨 ℓ) → Table d e → d ⊆ᵈ e
+@@ -562,10 +562,10 @@ module _ {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρ} (𝑭
+     ¬→-split (no ¬p) ¬imp  = ⊥-elim (¬imp (λ p → ⊥-elim (¬p p)))
+ 
+     unpack : Σ[ x ∈ 𝕌[ 𝑨 ] ] Σ[ y ∈ 𝕌[ 𝑨 ] ] (ConRel d x y × ¬ ConRel e x y)
+-    unpack with ¬∀⟶∃¬ _ _ (λ i → all? (λ j →
+-                   proj₂ d (𝑭 .enum i) (𝑭 .enum j) →-dec proj₂ e (𝑭 .enum i) (𝑭 .enum j))) ¬tbl
+-    ... | i , ¬rowᵢ with ¬∀⟶∃¬ _ _ (λ j →
+-                   proj₂ d (𝑭 .enum i) (𝑭 .enum j) →-dec proj₂ e (𝑭 .enum i) (𝑭 .enum j)) ¬rowᵢ
++    unpack with ¬∀⇒∃¬ _ _ (λ i → all? (λ j →
++                   proj₂ d (𝑭 .enum i) (𝑭 .enum j) →? proj₂ e (𝑭 .enum i) (𝑭 .enum j))) ¬tbl
++    ... | i , ¬rowᵢ with ¬∀⇒∃¬ _ _ (λ j →
++                   proj₂ d (𝑭 .enum i) (𝑭 .enum j) →? proj₂ e (𝑭 .enum i) (𝑭 .enum j)) ¬rowᵢ
+     ...   | j , ¬impᵢⱼ =
+       𝑭 .enum i , 𝑭 .enum j , ¬→-split (proj₂ d (𝑭 .enum i) (𝑭 .enum j)) ¬impᵢⱼ
+ ```
+diff --git a/src/Overture/Operations/Properties.lagda.md b/src/Overture/Operations/Properties.lagda.md
+index be5cfd97d..13f94abdd 100644
+--- a/src/Overture/Operations/Properties.lagda.md
++++ b/src/Overture/Operations/Properties.lagda.md
+@@ -39,7 +39,7 @@ open import Data.Nat                                using ( ℕ )
+ open import Data.Fin                                using ( Fin )
+ open import Data.Fin.Properties                     using ( _≟_ ; all? )
+ open import Relation.Binary.PropositionalEquality   using ( _≡_ )
+-open import Relation.Nullary.Decidable.Core         using ( Dec ; _→-dec_ )
++open import Relation.Nullary.Decidable.Core         using ( Dec ; _→?_ )
+ ```
+ -->
+ 
+@@ -132,5 +132,5 @@ module _ {n m : ℕ} (act : Fin n → Fin m → Fin m) where
+   -- Elements that act the same are equal.
+   ActionFaithful? : Dec (∀ a b → (∀ q → act a q ≡ act b q) → a ≡ b)
+   ActionFaithful? =
+-    all? (λ a → all? (λ b → (all? (λ q → (act a q) ≟ (act b q))) →-dec (a ≟ b)))
++    all? (λ a → all? (λ b → (all? (λ q → (act a q) ≟ (act b q))) →? (a ≟ b)))
+ ```
+diff --git a/src/Setoid/Congruences/Certificates/Congruence.lagda.md b/src/Setoid/Congruences/Certificates/Congruence.lagda.md
+index 9019fe263..511f253f0 100644
+--- a/src/Setoid/Congruences/Certificates/Congruence.lagda.md
++++ b/src/Setoid/Congruences/Certificates/Congruence.lagda.md
+@@ -113,7 +113,7 @@ open import Relation.Binary                         using  ( Setoid )
+ open import Relation.Binary.PropositionalEquality   using  ( _≡_ ; refl ; sym ; trans
+                                                            ; cong ; subst ; subst₂ )
+ open import Relation.Nullary.Decidable              using  ( Dec ; yes ; no ; does ; map′
+-                                                           ; _×-dec_ ; _→-dec_ ; ¬? )
++                                                           ; _×?_ ; _→?_ ; ¬? )
+ 
+ -- Imports from the Agda Universal Algebra Library ----------------------------
+ open import Overture                                using  ( 𝓞 ; 𝓥 ; Signature
+@@ -268,7 +268,7 @@ follows in general (`tableResp-≈`{.AgdaFunction}).
+ 
+   coherent? : (pv : ParentVec card) → Dec (Coherent pv)
+   coherent? pv =
+-    all? (λ i → all? (λ j → (enum i ≟ enum j) →-dec (parent pv i ≟ᶠ parent pv j)))
++    all? (λ i → all? (λ j → (enum i ≟ enum j) →? (parent pv i ≟ᶠ parent pv j)))
+ 
+   -- The carrier-level relation presented by a parent vector.
+   TableRel : ParentVec card → BinaryRel 𝕌[ 𝑨 ] (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ)
+@@ -601,10 +601,10 @@ one justification against the seed list and the already-processed merges
+   justOK? : (ps done : List IdxPair) (i j : Fin card)
+     →  (ju : Justification card opCard arOf) → Dec (JustOK ps done i j ju)
+   justOK? ps done i j (seed s) =
+-    atPos? (λ p → (enum i ≟ enum (proj₁ p)) ×-dec (enum j ≟ enum (proj₂ p))) ps s
++    atPos? (λ p → (enum i ≟ enum (proj₁ p)) ×? (enum j ≟ enum (proj₂ p))) ps s
+   justOK? ps done i j (translate fi c w r) =
+     atPos? (λ p → (enum i ≟ (opEnum fi ^ 𝑨) (tupleOf fi (w [ c ]≔ proj₁ p)))
+-             ×-dec (enum j ≟ (opEnum fi ^ 𝑨) (tupleOf fi (w [ c ]≔ proj₂ p))))
++             ×? (enum j ≟ (opEnum fi ^ 𝑨) (tupleOf fi (w [ c ]≔ proj₂ p))))
+            done r
+ ```
+ 
+@@ -624,7 +624,7 @@ structural folds, as is the decider.
+     →  Dec (TraceValidFrom ps done tr)
+   traceValidFrom? ps done [] = yes (lift tt)
+   traceValidFrom? ps done (mkMerge i j ju ∷ tr) =
+-    justOK? ps done i j ju ×-dec traceValidFrom? ps ((i , j) ∷ done) tr
++    justOK? ps done i j ju ×? traceValidFrom? ps ((i , j) ∷ done) tr
+ 
+   TraceValid : List IdxPair → Trace card opCard arOf → Type ρ
+   TraceValid ps tr = TraceValidFrom ps [] tr
+@@ -904,8 +904,8 @@ certificate), and the soundness theorem consuming it.
+ 
+   cgCertOK? : (cc : CgCert card opCard arOf) → Dec (CgCertOK cc)
+   cgCertOK? cc =
+-    coherent? part ×-dec edgeCompat? part ×-dec respects? part seeds
+-      ×-dec traceValid? seeds trace ×-dec covers? part (replayRoots (merges trace))
++    coherent? part ×? edgeCompat? part ×? respects? part seeds
++      ×? traceValid? seeds trace ×? covers? part (replayRoots (merges trace))
+     where open CgCert cc
+ 
+   -- The certificate's claim, from its checked conditions.
+diff --git a/src/Setoid/Congruences/Certificates/Lattice.lagda.md b/src/Setoid/Congruences/Certificates/Lattice.lagda.md
+index 74304b44e..8d94372aa 100644
+--- a/src/Setoid/Congruences/Certificates/Lattice.lagda.md
++++ b/src/Setoid/Congruences/Certificates/Lattice.lagda.md
+@@ -100,7 +100,7 @@ open import Relation.Binary       using  ( Setoid )
+ open import Relation.Binary.PropositionalEquality
+                                   using  ( _≡_ ; sym ; trans ; subst )
+ open import Relation.Nullary.Decidable
+-                                  using  ( Dec ; map′ ; _×-dec_ ; _→-dec_ )
++                                  using  ( Dec ; map′ ; _×?_ ; _→?_ )
+ 
+ -- Imports from the Agda Universal Algebra Library ----------------------------
+ open import Overture                                    using  ( 𝓞 ; 𝓥 ; Signature )
+@@ -210,32 +210,32 @@ deciders of [Setoid.Congruences.Certificates.Congruence][] and Schema.
+          nfOK , cohOK , ecOK , injOK , botOK , prinRespOK , prinTrOK , prinCovOK
+               , joinRespOK , joinTrOK , joinCovOK , meetOKˡ , meetOKʳ , meetOK²)
+       (     all? (λ k → normalForm? (partAt k))
+-      ×-dec all? (λ k → coherent? (partAt k))
+-      ×-dec all? (λ k → edgeCompat? (partAt k))
+-      ×-dec all? (λ k → all? (λ l →
++      ×? all? (λ k → coherent? (partAt k))
++      ×? all? (λ k → edgeCompat? (partAt k))
++      ×? all? (λ k → all? (λ l →
+               all? (λ i → parent (partAt k) i ≟ᶠ parent (partAt l) i)
+-                →-dec (k ≟ᶠ l)))
+-      ×-dec all? (λ i → all? (λ j →
++                →? (k ≟ᶠ l)))
++      ×? all? (λ i → all? (λ j →
+               (parent (partAt bot) i ≟ᶠ parent (partAt bot) j)
+-                →-dec (enum i ≟ enum j)))
+-      ×-dec all? (λ i → all? (λ j → respects? (partAt (prin i j)) ((i , j) ∷ [])))
+-      ×-dec all? (λ i → all? (λ j → traceValid? ((i , j) ∷ []) (prinTrace i j)))
+-      ×-dec all? (λ i → all? (λ j → covers? (partAt (prin i j))
++                →? (enum i ≟ enum j)))
++      ×? all? (λ i → all? (λ j → respects? (partAt (prin i j)) ((i , j) ∷ [])))
++      ×? all? (λ i → all? (λ j → traceValid? ((i , j) ∷ []) (prinTrace i j)))
++      ×? all? (λ i → all? (λ j → covers? (partAt (prin i j))
+                                       (replayRoots (merges (prinTrace i j)))))
+-      ×-dec all? (λ k → all? (λ l → respects? (partAt (join k l)) (joinSeeds k l)))
+-      ×-dec all? (λ k → all? (λ l → traceValid? (joinSeeds k l) (joinTrace k l)))
+-      ×-dec all? (λ k → all? (λ l → covers? (partAt (join k l))
++      ×? all? (λ k → all? (λ l → respects? (partAt (join k l)) (joinSeeds k l)))
++      ×? all? (λ k → all? (λ l → traceValid? (joinSeeds k l) (joinTrace k l)))
++      ×? all? (λ k → all? (λ l → covers? (partAt (join k l))
+                                       (replayRoots (merges (joinTrace k l)))))
+-      ×-dec all? (λ k → all? (λ l → all? (λ i → all? (λ j →
++      ×? all? (λ k → all? (λ l → all? (λ i → all? (λ j →
+               (parent (partAt (meet k l)) i ≟ᶠ parent (partAt (meet k l)) j)
+-                →-dec (parent (partAt k) i ≟ᶠ parent (partAt k) j)))))
+-      ×-dec all? (λ k → all? (λ l → all? (λ i → all? (λ j →
++                →? (parent (partAt k) i ≟ᶠ parent (partAt k) j)))))
++      ×? all? (λ k → all? (λ l → all? (λ i → all? (λ j →
+               (parent (partAt (meet k l)) i ≟ᶠ parent (partAt (meet k l)) j)
+-                →-dec (parent (partAt l) i ≟ᶠ parent (partAt l) j)))))
+-      ×-dec all? (λ k → all? (λ l → all? (λ i → all? (λ j →
++                →? (parent (partAt l) i ≟ᶠ parent (partAt l) j)))))
++      ×? all? (λ k → all? (λ l → all? (λ i → all? (λ j →
+               (parent (partAt k) i ≟ᶠ parent (partAt k) j)
+-                →-dec ((parent (partAt l) i ≟ᶠ parent (partAt l) j)
+-                →-dec (parent (partAt (meet k l)) i ≟ᶠ parent (partAt (meet k l)) j)))))))
++                →? ((parent (partAt l) i ≟ᶠ parent (partAt l) j)
++                →? (parent (partAt (meet k l)) i ≟ᶠ parent (partAt (meet k l)) j)))))))
+ ```
+ 
+ #### The certified entries
+diff --git a/src/Setoid/Congruences/Certificates/Schema.lagda.md b/src/Setoid/Congruences/Certificates/Schema.lagda.md
+index 34d271e42..65194f98f 100644
+--- a/src/Setoid/Congruences/Certificates/Schema.lagda.md
++++ b/src/Setoid/Congruences/Certificates/Schema.lagda.md
+@@ -66,7 +66,7 @@ open import Data.Nat.Base                          using  ( ℕ )
+ open import Data.Product                           using  ( _×_ ; _,_ )
+ open import Data.Vec.Base                          using  ( Vec ; lookup )
+ open import Relation.Binary.PropositionalEquality  using  ( _≡_ )
+-open import Relation.Nullary.Decidable             using  ( Dec ; ¬? ; _×-dec_ )
++open import Relation.Nullary.Decidable             using  ( Dec ; ¬? ; _×?_ )
+ ```
+ -->
+ 
+@@ -118,7 +118,7 @@ NormalForm : {n : ℕ} → ParentVec n → Type
+ NormalForm pv = IdempotentParent pv × DecreasingParent pv
+ 
+ normalForm? : {n : ℕ} (pv : ParentVec n) → Dec (NormalForm pv)
+-normalForm? pv = idempotentParent? pv ×-dec decreasingParent? pv
++normalForm? pv = idempotentParent? pv ×? decreasingParent? pv
+ ```
+ 
+ #### Forest edges
+diff --git a/src/Setoid/Congruences/Presented/Basic.lagda.md b/src/Setoid/Congruences/Presented/Basic.lagda.md
+index 909f82ede..d945e115c 100644
+--- a/src/Setoid/Congruences/Presented/Basic.lagda.md
++++ b/src/Setoid/Congruences/Presented/Basic.lagda.md
+@@ -60,7 +60,7 @@ open import Data.Product                        using  ( _×_ ; _,_ ; proj₁ ;
+ open import Level                               using  ( Level ; _⊔_ )
+ open import Relation.Binary                     using  ( Setoid ; IsEquivalence )
+                                                 renaming ( Rel to BinaryRel )
+-open import Relation.Nullary.Decidable          using  ( Dec ; _×-dec_ )
++open import Relation.Nullary.Decidable          using  ( Dec ; _×?_ )
+ 
+ -- Imports from the Agda Universal Algebra Library ----------------------------
+ open import Overture                         using ( 𝓞 ; 𝓥 ; Signature )
+@@ -94,7 +94,7 @@ module _ {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρ} where
+   -- The presented relation is decidable whenever ≈ is.
+   fromPairs? : (∀ x y → Dec (x ≈ y)) → (ps : List (𝕌[ 𝑨 ] × 𝕌[ 𝑨 ]))
+     → ∀ x y → Dec (fromPairs ps x y)
+-  fromPairs? _≟_ ps x y = any? (λ p → x ≟ proj₁ p ×-dec y ≟ proj₂ p) ps
++  fromPairs? _≟_ ps x y = any? (λ p → x ≟ proj₁ p ×? y ≟ proj₂ p) ps
+ ```
+ 
+ A small helper used repeatedly below: a congruence relates `≈`-equal replacements
+diff --git a/src/Setoid/Congruences/Presented/Decidable.lagda.md b/src/Setoid/Congruences/Presented/Decidable.lagda.md
+index b10bdd751..f1bfaf581 100644
+--- a/src/Setoid/Congruences/Presented/Decidable.lagda.md
++++ b/src/Setoid/Congruences/Presented/Decidable.lagda.md
+@@ -85,7 +85,7 @@ open import Data.Bool.Base        using  ( Bool ; true ; false ; T )
+ open import Data.Bool.Properties  using  () renaming ( _≟_ to _≟ᵇ_ )
+ open import Data.Empty            using  ( ⊥-elim )
+ open import Data.Fin.Base         using  ( Fin ; zero ; suc )
+-open import Data.Fin.Properties   using  ( any? ; all? ; ¬∀⟶∃¬ )
++open import Data.Fin.Properties   using  ( any? ; all? ; ¬∀⇒∃¬ )
+ open import Data.List.Base        using  ( List ; [] ; _∷_ ; map ; concatMap ; allFin )
+ open import Data.Nat.Base         using  ( ℕ ; zero ; suc ; _+_ ; _*_
+                                          ; _≤_ ; _<_ ; z≤n ; s≤s )
+@@ -104,7 +104,7 @@ open import Relation.Binary       using  ( Setoid )
+ 
+ open import Relation.Nullary            using  ( ¬_ ; ofʸ ; ofⁿ )
+ open import Relation.Nullary.Decidable  using  ( Dec ; yes ; no ; _because_ ; does ; map′
+-                                               ; T? ; _⊎-dec_ ; _×-dec_ )
++                                               ; T? ; _⊎?_ ; _×?_ )
+ 
+ open import Relation.Binary.PropositionalEquality  using  ( _≡_ ; refl ; sym ; cong
+                                                           ; _≢_ ; trans ; subst ; subst₂ )
+@@ -330,7 +330,7 @@ or presented.
+   BaseHit i j = (enum i ≈ enum j) ⊎ R (enum i) (enum j)
+ 
+   baseHit? : ∀ i j → Dec (BaseHit i j)
+-  baseHit? i j = (enum i ≟ enum j) ⊎-dec R? (enum i) (enum j)
++  baseHit? i j = (enum i ≟ enum j) ⊎? R? (enum i) (enum j)
+ 
+   -- The seed matrix.  (Private: it is internal machinery of the closure
+   -- computation, and the name `seed` is the certificate-schema vocabulary of
+@@ -379,8 +379,8 @@ compatibility hit at one enumerated operation symbol.
+   opHit? : ∀ M fi i j → Dec (OpHit M fi i j)
+   opHit? M fi i j =
+     anyL? (λ t → anyL? (λ s → allRelated? M t s
+-                        ×-dec ((enum i ≟ (f ^ 𝑨) (tupleOf f t))
+-                        ×-dec (enum j ≟ (f ^ 𝑨) (tupleOf f s))))
++                        ×? ((enum i ≟ (f ^ 𝑨) (tupleOf f t))
++                        ×? (enum j ≟ (f ^ 𝑨) (tupleOf f s))))
+                        (allVecs card (arCard f)))
+           (allVecs card (arCard f))
+     where f = opEnum fi
+@@ -390,7 +390,7 @@ compatibility hit at one enumerated operation symbol.
+   TransHit M i j = ∃[ k ] (T (M i k) × T (M k j))
+ 
+   transHit? : ∀ M i j → Dec (TransHit M i j)
+-  transHit? M i j = any? (λ k → T? (M i k) ×-dec T? (M k j))
++  transHit? M i j = any? (λ k → T? (M i k) ×? T? (M k j))
+ 
+   -- All the ways an entry can be set by one closure step.
+   StepHit : Matrix → Fin card → Fin card → Type ρ
+@@ -398,7 +398,7 @@ compatibility hit at one enumerated operation symbol.
+ 
+   stepHit? : ∀ M i j → Dec (StepHit M i j)
+   stepHit? M i j =
+-    T? (M i j) ⊎-dec T? (M j i) ⊎-dec transHit? M i j ⊎-dec any? (λ fi → opHit? M fi i j)
++    T? (M i j) ⊎? T? (M j i) ⊎? transHit? M i j ⊎? any? (λ fi → opHit? M fi i j)
+ 
+   -- One closure step.
+   step : Matrix → Matrix
+@@ -462,9 +462,9 @@ with fuel `suc entries`, it always does.
+   -- A non-fixpoint step strictly increases the count of set bits.
+   step-strict : ∀ M → ¬ MatEq M (step M) → matCount M < matCount (step M)
+   step-strict M ¬eq =
+-    let (i₀ , ¬rowi₀) = ¬∀⟶∃¬ card (λ i → ∀ j → M i j ≡ step M i j)
++    let (i₀ , ¬rowi₀) = ¬∀⇒∃¬ card (λ i → ∀ j → M i j ≡ step M i j)
+                               (λ i → all? (λ j → M i j ≟ᵇ step M i j)) ¬eq
+-        (j₀ , ¬eqij)  = ¬∀⟶∃¬ card (λ j → M i₀ j ≡ step M i₀ j)
++        (j₀ , ¬eqij)  = ¬∀⇒∃¬ card (λ j → M i₀ j ≡ step M i₀ j)
+                               (λ j → M i₀ j ≟ᵇ step M i₀ j) ¬rowi₀
+         (¬mij , sij)  = bit-flip (step-inflate M i₀ j₀) ¬eqij
+     in  matCount-strict (step-inflate M) i₀ j₀ ¬mij sij
+diff --git a/src/Setoid/Operations/Properties.lagda.md b/src/Setoid/Operations/Properties.lagda.md
+index 7c2e6572e..35ba16b32 100644
+--- a/src/Setoid/Operations/Properties.lagda.md
++++ b/src/Setoid/Operations/Properties.lagda.md
+@@ -65,7 +65,7 @@ open import Data.Nat                               using ( ℕ )
+ open import Data.Product                           using ( _×_ ; _,_ )
+ open import Relation.Binary.Bundles                using ( DecSetoid )
+ open import Relation.Binary.PropositionalEquality  using ( _≡_ ; refl )
+-open import Relation.Nullary.Decidable.Core        using ( Dec ; map′ ; from-yes ; _×-dec_ )
++open import Relation.Nullary.Decidable.Core        using ( Dec ; map′ ; from-yes ; _×?_ )
+ 
+ import Data.Bool.Properties as BoolP
+ open import Data.Fin.Properties  using (≡-decSetoid) renaming (all? to FinAll?)
+@@ -270,7 +270,7 @@ supply an exhaustive-search witness for `Bool`{.AgdaDatatype} directly and run t
+ checkers over the propositional decidable setoid on `Bool`{.AgdaDatatype}.  Searching
+ `Bool`{.AgdaDatatype} is immediate: `∀ b → P b` holds iff both `P false` and `P true`
+ do, so a pointwise decider for `P` decides the universal by a single
+-`_×-dec_`{.AgdaFunction}.  This both demonstrates the abstraction and previews, in
++`_×?_`{.AgdaFunction}.  This both demonstrates the abstraction and previews, in
+ miniature, the kind of witness an M9-1 `Searchable` carrier would provide
+ generically.  The section is `private`{.AgdaKeyword}: it validates the generalization
+ without enlarging the module's public surface.
+@@ -283,7 +283,7 @@ private
+   Bool-Exhaustible = record { all? = bool-all? }
+     where
+     bool-all? : ∀ {p} {P : Bool → Type p} → (∀ b → Dec (P b)) → Dec (∀ b → P b)
+-    bool-all? {P = P} P? = map′ to from (P? false ×-dec P? true)
++    bool-all? {P = P} P? = map′ to from (P? false ×? P? true)
+       where
+       to : P false × P true → (∀ b → P b)
+       to (pf , _ ) false = pf
+diff --git a/src/Setoid/Subalgebras/Subdirect/Finite.lagda.md b/src/Setoid/Subalgebras/Subdirect/Finite.lagda.md
+index b22ae34cf..1e80dea94 100644
+--- a/src/Setoid/Subalgebras/Subdirect/Finite.lagda.md
++++ b/src/Setoid/Subalgebras/Subdirect/Finite.lagda.md
+@@ -62,7 +62,7 @@ module Setoid.Subalgebras.Subdirect.Finite where
+ open import Agda.Primitive                 using  () renaming ( Set to Type )
+ open import Data.Empty                     using  ( ⊥-elim )
+ open import Data.Fin.Base                  using  ( Fin )
+-open import Data.Fin.Properties            using  ( all? ; ¬∀⟶∃¬ )
++open import Data.Fin.Properties            using  ( all? ; ¬∀⇒∃¬ )
+ open import Data.List.Base                 using  ( List ; filter ; length
+                                                   ; allFin ; cartesianProduct )
+ open import Data.List.Extrema.Nat          using  ( argmax ; f[xs]≤f[argmax] ; argmax-sel )
+@@ -75,7 +75,7 @@ open import Function                       using  ( _∘_ )
+ open import Level                          using  ( Level ; _⊔_ ; 0ℓ ; lower )
+ open import Relation.Binary                using  ( Setoid ; IsEquivalence )
+ open import Relation.Nullary               using  ( ¬_ ; Dec ; yes ; no )
+-open import Relation.Nullary.Decidable     using  ( _→-dec_ ; ¬? )
++open import Relation.Nullary.Decidable     using  ( _→?_ ; ¬? )
+ 
+ open import Data.List.Membership.Propositional     using  ( _∈_ )
+ open import Relation.Binary.PropositionalEquality  using  ( _≡_ ; refl ; subst ; sym )
+@@ -162,7 +162,7 @@ module _ {𝓞 𝓥 : Level}{𝑆 : Signature 𝓞 𝓥}{𝑨 : Algebra {𝑆 =
+   d ⊆ᶜ e = ∀ i j → ConRel d (enum i) (enum j) → ConRel e (enum i) (enum j)
+ 
+   _⊆ᶜ?_ : (d e : DecCon 𝑨 ℓ) → Dec (d ⊆ᶜ e)
+-  d ⊆ᶜ? e = all? (λ i → all? (λ j → ((i , j) ∈? d) →-dec ((i , j) ∈? e)))
++  d ⊆ᶜ? e = all? (λ i → all? (λ j → ((i , j) ∈? d) →? ((i , j) ∈? e)))
+ ```
+ 
+ A congruence contained in another relates no more pairs (`count-mono`); if the
+@@ -279,13 +279,13 @@ carrier-containment.
+       where
+       -- The two existential witnesses, each extracted once and shared.
+       exi : ∃[ i ] ¬ (∀ j → ConRel d (enum i) (enum j) → ConRel Θ-dec (enum i) (enum j))
+-      exi = ¬∀⟶∃¬ card _ (λ i → all? (λ j → (i , j) ∈? d →-dec (i , j) ∈? Θ-dec)) ¬h
++      exi = ¬∀⇒∃¬ card _ (λ i → all? (λ j → (i , j) ∈? d →? (i , j) ∈? Θ-dec)) ¬h
+ 
+       i₀ : Fin card
+       i₀ = exi .proj₁
+ 
+       exj : ∃[ j ] ¬ (ConRel d (enum i₀) (enum j) → ConRel Θ-dec (enum i₀) (enum j))
+-      exj = ¬∀⟶∃¬ card _ (λ j → (i₀ , j) ∈? d →-dec (i₀ , j) ∈? Θ-dec) (proj₂ exi)
++      exj = ¬∀⇒∃¬ card _ (λ j → (i₀ , j) ∈? d →? (i₀ , j) ∈? Θ-dec) (proj₂ exi)
+ 
+       j₀ : Fin card
+       j₀ = exj .proj₁
+diff --git a/src/Setoid/Subalgebras/Subdirect/Irreducible.lagda.md b/src/Setoid/Subalgebras/Subdirect/Irreducible.lagda.md
+index 3d7fc9130..b9fce9000 100644
+--- a/src/Setoid/Subalgebras/Subdirect/Irreducible.lagda.md
++++ b/src/Setoid/Subalgebras/Subdirect/Irreducible.lagda.md
+@@ -40,7 +40,7 @@ module Setoid.Subalgebras.Subdirect.Irreducible where
+ -- Imports from Agda and the Agda Standard Library ----------------------------
+ open import Agda.Primitive                         using () renaming ( Set to Type )
+ open import Data.Fin.Base                          using ( Fin )
+-open import Data.Fin.Properties                    using ( ¬∀⟶∃¬ )
++open import Data.Fin.Properties                    using ( ¬∀⇒∃¬ )
+ open import Data.Nat.Base                          using ( ℕ )
+ open import Data.Product                           using ( _,_ ; ∃-syntax ; proj₁ ; proj₂ )
+ open import Function                               using ( id )
+@@ -228,7 +228,7 @@ module _
+ 
+     -- finite + decidable ⟹ some coordinate's kernel is (¬¬, hence) below the diagonal
+     ex : ∃[ i ] ¬ Nonzero 𝑨 (kerfam 𝒜 h i)
+-    ex = ¬∀⟶∃¬ n (λ i → Nonzero 𝑨 (kerfam 𝒜 h i)) (λ i → ¬? (dec i)) ¬all-nz
++    ex = ¬∀⇒∃¬ n (λ i → Nonzero 𝑨 (kerfam 𝒜 h i)) (λ i → ¬? (dec i)) ¬all-nz
+ 
+     i : Fin n
+     i = proj₁ ex

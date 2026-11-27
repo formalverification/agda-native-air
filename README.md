@@ -1,7 +1,7 @@
 <!-- File: agda-native-air/README.md -->
 
 # Agda-native AIR
-[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.9.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/backend_GHC-9.10.3-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
+[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.9.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/backend_GHC-9.12.2-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
 
 *Agda-native Artificial Intelligence Reasoning environment*
 
@@ -48,7 +48,7 @@ agda-native-air/
 ├── README.md
 ├── LICENSE, LICENSE-docs, CONTRIBUTING.md
 ├── .github/                   # CI workflow, CODEOWNERS, issue and PR templates
-├── flake.nix, flake.lock      # the pinned toolchain: Agda 2.9.0, stdlib 2.3, GHC, Scala, Spark, Python
+├── flake.nix, flake.lock      # the pinned toolchain: Agda 2.9.0, stdlib 2.4.1, GHC, Scala, Spark, Python
 ├── Makefile                   # the single CLI for extract → transform → ETL → train → eval
 ├── agda-dojang/               # repo-local Agda library (reflection macros) + evaluation harness
 ├── agda-mcp/                  # the MCP server (Haskell)
@@ -269,12 +269,11 @@ make eval-proof-completion-smoke
 make help    # see what's available and working now
 ```
 
-**The toolchain** is Agda 2.9.0, not yet released (agda/agda at the `nightly`
-of 2026-10-05), with standard-library 2.3 patched to type-check under it, both
-pinned by the flake.  Until Agda 2.9.0 and a standard library for it are
-released, the toolchain is available only through `nix develop`, which needs
-Nix 2.28 or later and fetches it prebuilt from the `formalverification` Cachix
-cache.
+**The toolchain** is the released Agda 2.9.0 with the released
+standard-library 2.4.1, both pinned by the flake.  nixpkgs does not package
+Agda 2.9.0 yet, so the flake builds it from agda/agda's tag `v2.9.0`;
+`nix develop` needs Nix 2.28 or later and fetches the toolchain prebuilt from
+the `formalverification` Cachix cache.
 
 **The project site** (the pages at
 [formalverification.github.io/agda-native-air](https://formalverification.github.io/agda-native-air/),

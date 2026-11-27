@@ -82,16 +82,16 @@ agent.
 git clone git@github.com:formalverification/agda-native-air.git
 cd agda-native-air
 nix develop          # Agda 2.9.0, Scala/sbt, Python; NOT a pinned GHC
-nix develop .#backend # add the pinned GHC 9.10.3 + Cabal (Haskell work)
+nix develop .#backend # add the pinned GHC 9.12.2 + Cabal (Haskell work)
 make check           # build + test all components
  ```
 
-The toolchain is Agda 2.9.0, not yet released (agda/agda at `da66a8c`, the
-`nightly` of 2026-10-05), with standard-library 2.3 patched to type-check under
-it (formalverification/agda-stdlib, tag `v2.3-agda-2.9.0`).  Until Agda 2.9.0
-and a standard library for it are released, the toolchain is available only
-through `nix develop`, and the flake needs Nix 2.28 or later; the
-`formalverification` Cachix cache serves it prebuilt.
+The toolchain is the released Agda 2.9.0 (agda/agda's tag `v2.9.0`, commit
+`da046d69`) with the released standard-library 2.4.1 (agda/agda-stdlib's tag
+`v2.4.1`).  nixpkgs does not package Agda 2.9.0 yet, so the flake builds it
+from that tag and needs Nix 2.28 or later; the `formalverification` Cachix
+cache serves it prebuilt.  The backend shell's GHC is the one Agda's own flake
+builds Agda with (9.12.2 at the tag), since agda-strux links Agda as a library.
 
 For `agda-mcp` specifically (build, run, connect Claude Code), see
 [HowToRun §13](docs/HowToRun.md#13--agda-mcp-ai-assisted-proof-development).
@@ -113,8 +113,8 @@ descriptions.
 Inside `nix develop`, `agda` is a shell function: it runs the pinned Agda 2.9.0
 with `--library-file "$AGDA_DIR/libraries"`, the registry the shell writes at
 the root of each checkout, and that registry is the only place `agda-dojang`,
-the pinned standard library 2.3 (patched for 2.9.0), and the pinned
-agda-algebras are registered.
+the pinned standard library 2.4.1, and the pinned agda-algebras are
+registered.
 An Emacs started outside the shell sees none of this, so loading a benchmark
 fixture fails with `Library 'agda-dojang' not found`.  You do not have to start
 Emacs inside the shell; two steps give agda-mode the same Agda and the same

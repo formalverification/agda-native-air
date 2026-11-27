@@ -358,7 +358,8 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
 #   make ci-smoke CI_SKIP_ML=1       # skip Python (e.g., no venv yet)
 #
 # NOTE: CI now uses Nix + Cachix for the Haskell backend (same as the
-# agda-dojang-eval lane) with pinned GHC 9.8.2.  For local backend runs, two modes
+# agda-dojang-eval lane) with the GHC of `nix develop .#backend` (9.12.2).  For
+# local backend runs, two modes
 # are supported:
 #   1.  From outside Nix: `make backend-test` auto-wraps via `nix develop .#backend`
 #       (BACKEND_USE_NIX=1, the default).
@@ -729,7 +730,7 @@ backend-clean:
 # 1.4.1. agda-mcp (Haskell MCP server) — build / test / smoke / serve
 #
 # Like the agda-strux targets above, these run cabal inside the flake backend
-# shell (GHC 9.10.3 + Agda 2.9.0) via run_backend, so `make agda-mcp-test` works
+# shell (GHC 9.12.2 + Agda 2.9.0) via run_backend, so `make agda-mcp-test` works
 # from outside a Nix shell.  When already inside `nix develop .#backend` (or in
 # CI, whose outer step is `nix develop`), pass BACKEND_USE_NIX=0 to avoid nesting.
 #

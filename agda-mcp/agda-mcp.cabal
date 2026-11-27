@@ -24,7 +24,8 @@ cabal-version: 3.0
 --
 --   Design note (GHC version):
 --   The `mcp-server` Hackage library requires base >= 4.20 (GHC 9.10+), but
---   agda-strux pins GHC 9.8.2 for Agda-as-a-library compatibility.  Rather
+--   agda-strux pinned GHC 9.8.2 for Agda-as-a-library compatibility when
+--   this was written (the backend shell is on GHC 9.12.2 now).  Rather
 --   than introduce a second GHC version, we implement a minimal MCP stdio
 --   transport (~200 lines) in AgdaMCP.Server.  This covers the subset of MCP
 --   we need (initialize, tools/list, tools/call) and can be swapped for the
